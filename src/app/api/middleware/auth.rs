@@ -2,7 +2,7 @@
 
 use axum::{
     extract::Request,
-    http::{header::AUTHORIZATION, StatusCode},
+    http::header::AUTHORIZATION,
     middleware::Next,
     response::Response,
 };

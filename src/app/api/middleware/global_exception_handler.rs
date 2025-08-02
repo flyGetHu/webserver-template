@@ -1,13 +1,12 @@
 use axum::{
     extract::Request,
-    http::StatusCode,
     middleware::Next,
     response::{IntoResponse, Response},
     Json,
 };
 use uuid::Uuid;
 
-use crate::app::error::{ApiError, AppError};
+use crate::app::error::AppError;
 
 pub async fn global_exception_handler(req: Request, next: Next) -> Response {
     let request_id = *req.extensions().get::<Uuid>().unwrap();

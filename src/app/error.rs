@@ -22,7 +22,7 @@ pub enum AppError {
     Validation(String),
 
     /// 数据库错误
-    #[error("Database error: {0}")]
+    #[error("Database error")]
     Database(#[from] sqlx::Error),
 
     /// 未找到资源错误
@@ -31,7 +31,7 @@ pub enum AppError {
 
     /// 其他内部错误
     #[error("Internal server error")]
-    Internal(#[from] anyhow::Error),
+    Internal(String),
 }
 
 /// 统一的API错误响应格式
@@ -112,8 +112,8 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         // 创建一个临时的响应
         let mut response = StatusCode::INTERNAL_SERVER_ERROR.into_response();
-        // 将AppError自身插入到响应的扩展中
-        response.extensions_mut().insert(self);
+        // 将AppError字符串插入到响应的扩展中
+        response.extensions_mut().insert(self.to_string());
         response
     }
 }
