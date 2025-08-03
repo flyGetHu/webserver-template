@@ -32,3 +32,7 @@ bb8-redis = "0.24.0"
 jsonwebtoken = "9.3.1"
 chrono = { version = "0.4.41", features = ["serde"] }
 argon2 = "0.5.3"
+
+# API Documentation dependencies
+utoipa = { version = "5.3.0", features = ["axum_extras", "chrono", "uuid", "time"] }
+utoipa-swagger-ui = { version = "9.0.0", features = ["axum"] }

@@ -7,7 +7,7 @@ use axum::{
     Router,
 };
 
-use crate::app::{api::handlers::user_handler, state::AppState};
+use crate::app::{api::{handlers::user_handler, docs}, state::AppState};
 
 /// 创建应用的所有路由
 ///
@@ -18,11 +18,23 @@ pub fn create_routes() -> Router<AppState> {
         .route("/health", get(health_check))
         // 用户相关端点
         .route("/api/v1/users", post(user_handler::create_user))
+        // Swagger UI文档端点
+        .merge(docs::create_swagger_routes())
 }
 
-/// 健康检查处理函数
+/// 健康检查
 ///
-/// 用于检查服务器是否正常运行
+/// 用于检查服务器是否正常运行，返回简单的状态信息。
+#[utoipa::path(
+    get,
+    path = "/health",
+    tag = "系统",
+    responses(
+        (status = 200, description = "服务正常运行", body = String, example = "OK"),
+        (status = 503, description = "服务不可用")
+    ),
+    operation_id = "health_check"
+)]
 async fn health_check() -> &'static str {
     "OK"
 }
