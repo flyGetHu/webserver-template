@@ -7,12 +7,12 @@ use axum::{
     Router,
 };
 
-use crate::app::{api::{handlers::user_handler, docs}, state::AppState};
+use crate::app::{api::{handlers::user_handler, docs}, container::ServiceRegistry};
 
 /// 创建应用的所有路由
 ///
 /// 此函数负责将URL路径映射到相应的处理函数
-pub fn create_routes() -> Router<AppState> {
+pub fn create_routes() -> Router<ServiceRegistry> {
     Router::new()
         // 健康检查端点
         .route("/health", get(health_check))

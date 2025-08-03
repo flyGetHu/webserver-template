@@ -1,6 +1,7 @@
 //! 应用模块声明
 
 pub mod config;
+pub mod container;
 pub mod error;
 pub mod state;
 pub mod api;
@@ -12,6 +13,8 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+use std::sync::Arc;
+
 use crate::app::{
     api::{
         middleware::{
@@ -21,6 +24,7 @@ use crate::app::{
         routes::create_routes,
     },
     config::Config,
+    container::ServiceRegistry,
     state::AppState,
 };
 
@@ -49,6 +53,10 @@ pub async fn run() -> anyhow::Result<()> {
 
     // 创建应用状态
     let app_state = AppState::new(db_pool, redis_pool);
+    let app_state = Arc::new(app_state);
+
+    // 创建服务注册表
+    let service_registry = ServiceRegistry::new(Arc::new(config.clone()), app_state.clone()).await;
 
     // 创建路由和中间件
     let app = create_routes()
@@ -59,7 +67,7 @@ pub async fn run() -> anyhow::Result<()> {
                 .layer(middleware::from_fn(global_exception_handler))
                 .layer(TraceLayer::new_for_http()),
         )
-        .with_state(app_state);
+        .with_state(service_registry);
 
     // 绑定地址
     let addr: std::net::SocketAddr = format!("{}:{}", config.server.host, config.server.port)

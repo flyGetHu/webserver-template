@@ -2,15 +2,19 @@
 //!
 //! 包含所有与用户相关的API端点处理函数
 
-use axum::Extension;
+use axum::{Extension, extract::State};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::Validate;
 use utoipa::ToSchema;
 
-use crate::app::api::extractors::ValidatedJson;
-use crate::app::api::response::ApiResponse;
-use crate::app::error::AppError;
+use crate::app::{
+    api::extractors::ValidatedJson,
+    api::response::ApiResponse,
+    container::{ServiceRegistry, ServiceAccess},
+    domain::models::CreateUserDto,
+    error::AppError,
+};
 
 /// 创建用户请求的数据传输对象
 #[derive(Deserialize, Validate, ToSchema)]
@@ -23,6 +27,10 @@ pub struct CreateUserPayload {
     #[validate(email, required)]
     #[schema(example = "user@example.com", format = "email")]
     pub email: Option<String>,
+    /// 密码
+    #[validate(length(min = 6), required)]
+    #[schema(example = "password123", min_length = 6)]
+    pub password: Option<String>,
     /// 年龄
     #[schema(example = 25, minimum = 0, maximum = 150)]
     pub age: Option<u32>,
@@ -62,17 +70,27 @@ pub struct CreateUserResponse {
     operation_id = "create_user"
 )]
 pub async fn create_user(
+    State(service_registry): State<ServiceRegistry>,
     Extension(request_id): Extension<Uuid>,
     ValidatedJson(payload): ValidatedJson<CreateUserPayload>,
 ) -> Result<ApiResponse<CreateUserResponse>, AppError> {
-    // 在实际应用中，这里会调用领域服务或仓库来创建用户
-    // 目前我们只是模拟创建过程
-    let user = CreateUserResponse {
-        id: 1,
+    let auth_service = service_registry.auth_service();
+    
+    let create_user_dto = CreateUserDto {
         username: payload.username.unwrap(),
         email: payload.email.unwrap(),
-        age: payload.age,
+        password: payload.password.unwrap(),
+        age: payload.age.map(|v| v as i32),
     };
 
-    Ok(ApiResponse::new(user, request_id))
+    let user = auth_service.register_user(create_user_dto).await?;
+
+    let response = CreateUserResponse {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        age: user.age.map(|v| v as u32),
+    };
+
+    Ok(ApiResponse::new(response, request_id))
 }
