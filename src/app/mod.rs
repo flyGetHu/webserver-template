@@ -14,7 +14,10 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::app::{
     api::{
-        middleware::{global_exception_handler::global_exception_handler, request_id::add_request_id},
+        middleware::{
+            global_exception_handler::global_exception_handler,
+            request_id::add_request_id,
+        },
         routes::create_routes,
     },
     config::Config,

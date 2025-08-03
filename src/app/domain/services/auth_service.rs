@@ -6,7 +6,7 @@ use argon2::{
 };
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
-use sqlx::PgPool;
+use sqlx::MySqlPool;
 
 use crate::app::{
     api::middleware::auth::Claims,
@@ -17,13 +17,13 @@ use crate::app::{
 
 /// 认证服务
 pub struct AuthService {
-    db_pool: Arc<PgPool>,
+    db_pool: Arc<MySqlPool>,
     config: Arc<Config>,
 }
 
 impl AuthService {
     /// 创建新的认证服务实例
-    pub fn new(db_pool: Arc<PgPool>, config: Arc<Config>) -> Self {
+    pub fn new(db_pool: Arc<MySqlPool>, config: Arc<Config>) -> Self {
         Self { db_pool, config }
     }
 
@@ -33,7 +33,7 @@ impl AuthService {
     ) -> Result<User, AppError> {
         // 检查用户名是否已存在
         let existing_user = sqlx::query_as::<_, User>(
-            "SELECT * FROM users WHERE username = $1 OR email = $2"
+            "SELECT * FROM users WHERE username = ? OR email = ?"
         )
         .bind(&user_data.username)
         .bind(&user_data.email)
@@ -49,22 +49,28 @@ impl AuthService {
         let password_hash = self.hash_password(&user_data.password)?;
 
         // 创建用户
-        let user = sqlx::query_as::<_, User>(
+        let result = sqlx::query(
             r#"
             INSERT INTO users (username, email, password_hash, age, roles, is_active)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            RETURNING *
+            VALUES (?, ?, ?, ?, ?, ?)
             "#
         )
         .bind(&user_data.username)
         .bind(&user_data.email)
         .bind(password_hash)
         .bind(user_data.age)
-        .bind(vec!["user".to_string()]) // 默认角色
+        .bind(serde_json::to_string(&vec!["user".to_string()]).unwrap())
         .bind(true)
-        .fetch_one(self.db_pool.as_ref())
+        .execute(self.db_pool.as_ref())
         .await
         .map_err(|e| AppError::Database(e))?;
+
+        let user_id = result.last_insert_id() as i32;
+        let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = ?")
+            .bind(user_id)
+            .fetch_one(self.db_pool.as_ref())
+            .await
+            .map_err(|e| AppError::Database(e))?;
 
         Ok(user)
     }
@@ -73,8 +79,9 @@ impl AuthService {
     pub async fn login_user(&self, login_data: LoginUserDto) -> Result<String, AppError> {
         // 查找用户
         let user = sqlx::query_as::<_, User>(
-            "SELECT * FROM users WHERE (username = $1 OR email = $1) AND is_active = true"
+            "SELECT * FROM users WHERE (username = ? OR email = ?) AND is_active = true"
         )
+        .bind(&login_data.username_or_email)
         .bind(&login_data.username_or_email)
         .fetch_optional(self.db_pool.as_ref())
         .await
@@ -167,7 +174,7 @@ impl AuthService {
     /// 通过ID查找用户
     pub async fn find_user_by_id(&self, user_id: i32,
     ) -> Result<Option<User>, AppError> {
-        let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
+        let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = ?")
             .bind(user_id)
             .fetch_optional(self.db_pool.as_ref())
             .await

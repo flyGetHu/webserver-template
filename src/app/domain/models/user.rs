@@ -18,6 +18,7 @@ pub struct User {
     /// 年龄
     pub age: Option<i32>,
     /// 用户角色列表
+    #[sqlx(json)]
     pub roles: Vec<String>,
     /// 创建时间
     pub created_at: DateTime<Utc>,

@@ -17,7 +17,7 @@ async-trait = "0.1.88"
 config = "0.15.13"
 sqlx = { version = "0.8.6", features = [
   "runtime-tokio-rustls",
-  "postgres",
+  "mysql",
   "uuid",
   "time",
   "chrono",

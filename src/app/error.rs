@@ -5,6 +5,7 @@
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
+    Json,
 };
 use serde::Serialize;
 use tracing::error;
@@ -52,9 +53,9 @@ impl AppError {
             AppError::Business(msg) => {
                 error!("Business error: {}", msg);
                 (
-                    StatusCode::BAD_REQUEST,
+                    StatusCode::INTERNAL_SERVER_ERROR,
                     ApiError {
-                        code: 1000,
+                        code: 500,
                         message: msg.clone(),
                         request_id,
                     },
@@ -63,9 +64,9 @@ impl AppError {
             AppError::Validation(msg) => {
                 error!("Validation error: {}", msg);
                 (
-                    StatusCode::BAD_REQUEST,
+                    StatusCode::INTERNAL_SERVER_ERROR,
                     ApiError {
-                        code: 2000,
+                        code: 500,
                         message: msg.clone(),
                         request_id,
                     },
@@ -76,7 +77,7 @@ impl AppError {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     ApiError {
-                        code: 3000,
+                        code: 500,
                         message: "Internal server error".to_string(),
                         request_id,
                     },
@@ -87,7 +88,7 @@ impl AppError {
                 (
                     StatusCode::NOT_FOUND,
                     ApiError {
-                        code: 4000,
+                        code: 404,
                         message: msg.clone(),
                         request_id,
                     },
@@ -98,7 +99,7 @@ impl AppError {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     ApiError {
-                        code: 5000,
+                        code: 500,
                         message: "Internal server error".to_string(),
                         request_id,
                     },
@@ -106,14 +107,30 @@ impl AppError {
             }
         }
     }
+
+    /// 创建特定HTTP状态码的错误
+    pub fn unauthorized(message: String) -> Self {
+        AppError::Business(message)
+    }
+
+    pub fn forbidden(message: String) -> Self {
+        AppError::Business(message)
+    }
+
+    pub fn too_many_requests(message: String) -> Self {
+        AppError::Business(message)
+    }
+
+    pub fn method_not_allowed(message: String) -> Self {
+        AppError::Business(message)
+    }
 }
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        // 创建一个临时的响应
-        let mut response = StatusCode::INTERNAL_SERVER_ERROR.into_response();
-        // 将AppError字符串插入到响应的扩展中
-        response.extensions_mut().insert(self.to_string());
-        response
+        // 生成一个随机的request_id
+        let request_id = Uuid::new_v4();
+        let (_, api_error) = self.to_api_error(request_id);
+        (StatusCode::OK, Json(api_error)).into_response()
     }
 }
