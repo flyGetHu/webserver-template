@@ -7,6 +7,7 @@ pub mod state;
 pub mod api;
 pub mod domain;
 pub mod infrastructure;
+pub mod logging;
 use axum::middleware;
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
@@ -25,6 +26,7 @@ use crate::app::{
     },
     config::Config,
     container::ServiceRegistry,
+    logging::RequestIdFormat,
     state::AppState,
 };
 
@@ -38,7 +40,7 @@ pub async fn run() -> anyhow::Result<()> {
             std::env::var("RUST_LOG")
                 .unwrap_or_else(|_| "webserver_template=debug,tower_http=debug".into()),
         ))
-        .with(tracing_subscriber::fmt::layer())
+        .with(tracing_subscriber::fmt::layer().event_format(RequestIdFormat))
         .init();
 
     // 加载配置

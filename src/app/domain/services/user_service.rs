@@ -3,14 +3,12 @@
 use std::sync::Arc;
 
 use crate::app::{
-    config::Config,
-    domain::models::{User, CreateUserDto},
-    error::AppError,
+    config::Config, domain::models::User, error::AppError,
     infrastructure::persistence::user_repository::UserRepository,
 };
 
 /// 用户服务
-/// 
+///
 /// 处理用户相关的业务逻辑
 pub struct UserService {
     user_repository: Arc<UserRepository>,
