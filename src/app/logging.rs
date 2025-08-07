@@ -9,6 +9,7 @@ use tracing_subscriber::fmt::{
     FmtContext, FormatEvent,
 };
 use tracing_subscriber::registry::LookupSpan;
+use salvo::request_id::RequestId;
 
 /// 自定义日志格式化器
 #[derive(Debug, Clone)]
@@ -42,22 +43,15 @@ where
         write!(writer, "{:>5} ", level)?;
 
         // 尝试从当前 span 中获取 request_id
-        let request_id = ctx.event_scope()
-            .and_then(|scope| {
-                // 从作用域中获取最近的 span（最内层的 span）
-                scope.from_root().last().and_then(|span| {
-                    // 获取 span 扩展中的格式化字段
-                    let extensions = span.extensions();
-                    extensions.get::<N>().and_then(|_formatter| {
-                        // 注意：我们无法直接从 FormattedFields<N> 提取单个字段值
-                        // 因为 FormattedFields 类型不是公共的
-                        // 我们只能通过解析格式化后的字符串来提取 request_id
-                        // 这里返回 None，因为我们无法直接访问字段值
-                        None
-                    })
-                })
+        let request_id = if let Some(scope) = ctx.event_scope() {
+            scope.from_root().last().and_then(|span| {
+                // 从 span 的扩展中获取 request_id
+                let extensions = span.extensions();
+                extensions.get::<String>().cloned()
             })
-            .unwrap_or_else(|| "none".to_string());
+        } else {
+            None
+        }.unwrap_or_else(|| "none".to_string());
 
         // 写入 request_id
         write!(writer, "[request_id={}] ", request_id)?;

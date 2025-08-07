@@ -23,7 +23,10 @@ pub struct AppState {
 impl AppState {
     /// 创建新的应用状态实例
     pub fn new(db_pool: MySqlPool, redis_pool: RedisPool) -> Self {
-        Self { db_pool, redis_pool }
+        Self {
+            db_pool,
+            redis_pool,
+        }
     }
 }
 
@@ -32,26 +35,53 @@ impl AppState {
 /// 根据提供的数据库URL创建连接池
 pub async fn create_db_pool(db_url: &str) -> Result<MySqlPool, sqlx::Error> {
     info!("Creating database pool for {}", db_url);
-    
+
     let pool = MySqlPool::connect(db_url).await?;
     info!("Database pool created successfully");
-    
+
     Ok(pool)
 }
 
 /// 创建Redis连接池
 ///
 /// 根据提供的Redis URL创建连接池
-pub async fn create_redis_pool(redis_url: &str) -> Result<RedisPool, bb8::RunError<redis::RedisError>> {
+pub async fn create_redis_pool(
+    redis_url: &str,
+) -> Result<RedisPool, bb8::RunError<redis::RedisError>> {
     info!("Creating Redis pool for {}", redis_url);
-    
+
     let manager = RedisConnectionManager::new(redis_url).map_err(|e| {
         tracing::error!("Failed to create Redis connection manager: {}", e);
         bb8::RunError::User(e)
     })?;
-    
+
     let pool = bb8::Pool::builder().build(manager).await?;
     info!("Redis pool created successfully");
-    
+
+    Ok(pool)
+}
+
+/// 创建模拟数据库连接池（用于测试）
+pub async fn create_mock_db_pool() -> Result<MySqlPool, sqlx::Error> {
+    info!("Creating mock database pool for testing");
+
+    // 使用内存SQLite数据库作为模拟
+    let pool = MySqlPool::connect("mysql://root:root123@192.168.100.149:3306/test").await?;
+    info!("Mock database pool created successfully");
+
+    Ok(pool)
+}
+
+/// 创建模拟Redis连接池（用于测试）
+pub async fn create_mock_redis_pool() -> Result<RedisPool, bb8::RunError<redis::RedisError>> {
+    info!("Creating mock Redis pool for testing");
+
+    // 创建一个模拟的Redis管理器
+    let manager = RedisConnectionManager::new("redis://192.168.100.149:6379/")
+        .map_err(|e| bb8::RunError::User(e))?;
+
+    let pool = bb8::Pool::builder().build(manager).await?;
+    info!("Mock Redis pool created successfully");
+
     Ok(pool)
 }

@@ -5,12 +5,12 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.47.1", features = ["full"] }
-axum = "0.8.4"
+salvo = { version = "0.72", features = ["cors", "oapi", "compression", "request-id"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.142"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-tower-http = { version = "0.6.6", features = ["trace", "request-id", "cors"] }
+# tower-http replaced by salvo's built-in features
 dotenvy = "0.15.7"
 anyhow = "1.0.98"
 async-trait = "0.1.88"
@@ -22,7 +22,7 @@ sqlx = { version = "0.8.6", features = [
   "time",
   "chrono",
 ] }
-tower = "0.5.2"
+# tower replaced by salvo's built-in features
 validator = { version = "0.20.0", features = ["derive"] }
 thiserror = "2.0.12"
 uuid = { version = "1.17.0", features = ["v4"] }
@@ -33,7 +33,6 @@ jsonwebtoken = "9.3.1"
 chrono = { version = "0.4.41", features = ["serde"] }
 time = "0.3.37"
 
-# API Documentation dependencies
-utoipa = { version = "5.3.0", features = ["axum_extras", "chrono", "uuid", "time"] }
-utoipa-swagger-ui = { version = "9.0.0", features = ["axum"] }
+# API Documentation dependencies (built into Salvo)
+# utoipa replaced by salvo's built-in OpenAPI support
 argon2 = "0.5.3"

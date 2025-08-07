@@ -1,12 +1,8 @@
 //! 统一错误处理模块
 //!
-//! 定义应用的统一错误类型，并实现axum的IntoResponse trait以提供统一的错误响应格式
+//! 定义应用的统一错误类型，并实现salvo的Writer trait以提供统一的错误响应格式
 
-use axum::{
-    http::StatusCode,
-    response::{IntoResponse, Response},
-    Json,
-};
+use salvo::prelude::*;
 use serde::Serialize;
 use serde_json::Value;
 use tracing::error;
@@ -134,11 +130,13 @@ impl AppError {
     }
 }
 
-impl IntoResponse for AppError {
-    fn into_response(self) -> Response {
+impl Scribe for AppError {
+    fn render(self, res: &mut Response) {
         // 生成一个随机的request_id
         let request_id = Uuid::new_v4();
+        
         let (status, api_error) = self.to_api_error(request_id);
-        (status, Json(api_error)).into_response()
+        res.status_code(status);
+        res.render(Json(api_error));
     }
 }

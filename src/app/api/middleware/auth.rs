@@ -1,11 +1,6 @@
 //! 认证中间件模块
 
-use axum::{
-    extract::Request,
-    http::header::AUTHORIZATION,
-    middleware::Next,
-    response::Response,
-};
+use salvo::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::app::error::AppError;
@@ -52,7 +47,10 @@ impl CurrentUser {
 }
 
 /// JWT认证中间件
-pub async fn jwt_auth(mut req: Request, next: Next) -> Result<Response, AppError> {
+#[handler]
+pub async fn jwt_auth(req: &mut Request, depot: &mut Depot, res: &mut Response, ctrl: &mut FlowCtrl) -> Result<(), AppError> {
+    use salvo::http::header::AUTHORIZATION;
+    
     // 从请求头中获取Authorization
     let auth_header = req
         .headers()
@@ -73,25 +71,31 @@ pub async fn jwt_auth(mut req: Request, next: Next) -> Result<Response, AppError
     // 验证JWT令牌
     let claims = crate::app::domain::services::AuthService::verify_jwt(token)?;
 
-    // 将claims添加到请求扩展中
-    req.extensions_mut().insert(CurrentUser(claims));
+    // 将claims添加到depot中
+    depot.insert("current_user", CurrentUser(claims));
 
-    Ok(next.run(req).await)
+    // 继续处理请求
+    ctrl.call_next(req, depot, res).await;
+    Ok(())
 }
 
 /// 可选的JWT认证中间件
 /// 如果提供了有效的JWT令牌，则设置用户，否则继续处理
-pub async fn optional_jwt_auth(mut req: Request, next: Next) -> Response {
+#[handler]
+pub async fn optional_jwt_auth(req: &mut Request, depot: &mut Depot, res: &mut Response, ctrl: &mut FlowCtrl) {
+    use salvo::http::header::AUTHORIZATION;
+    
     if let Some(auth_header) = req.headers().get(AUTHORIZATION) {
         if let Ok(auth_str) = auth_header.to_str() {
             if auth_str.starts_with("Bearer ") {
                 let token = auth_str.trim_start_matches("Bearer ");
                 if let Ok(claims) = crate::app::domain::services::AuthService::verify_jwt(token) {
-                    req.extensions_mut().insert(CurrentUser(claims));
+                    depot.insert("current_user", CurrentUser(claims));
                 }
             }
         }
     }
 
-    next.run(req).await
+    // 继续处理请求
+    ctrl.call_next(req, depot, res).await;
 }

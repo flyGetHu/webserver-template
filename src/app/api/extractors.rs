@@ -1,30 +1,25 @@
 //! 自定义提取器模块
 //!
-//! 提供自定义的axum提取器，例如用于自动验证请求体的提取器
+//! 提供自定义的salvo提取器，例如用于自动验证请求体的提取器
 
-use axum::{body::Body, extract::FromRequest, http::Request, Json};
+use salvo::prelude::*;
 use serde::de::DeserializeOwned;
 use validator::Validate;
 
 use crate::app::{api::middleware::auth::CurrentUser, error::AppError};
 
-/// 一个自定义提取器，它包装了`axum::Json`，并在反序列化后自动验证数据
+/// 一个自定义提取器，它包装了`salvo::JsonBody`，并在反序列化后自动验证数据
 ///
 /// 如果验证失败，它会返回一个`AppError::Validation`错误
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ValidatedJson<T>(pub T);
 
-impl<S, T> FromRequest<S> for ValidatedJson<T>
+impl<T> ValidatedJson<T>
 where
-    S: Send + Sync,
     T: DeserializeOwned + Validate,
 {
-    type Rejection = AppError;
-
-    async fn from_request(req: Request<Body>, state: &S) -> Result<Self, Self::Rejection>
-    {
-        let Json(value) = Json::<T>::from_request(req, state)
-            .await
+    pub async fn extract(req: &mut Request) -> Result<Self, AppError> {
+        let value = req.parse_json::<T>().await
             .map_err(|e| AppError::Validation(e.to_string()))?;
 
         value
@@ -38,17 +33,12 @@ where
 /// 当前用户提取器
 ///
 /// 从请求扩展中提取当前认证用户的Claims
-impl<S> FromRequest<S> for CurrentUser
-where
-    S: Send + Sync,
-{
-    type Rejection = AppError;
-
-    async fn from_request(req: Request<Body>, _state: &S) -> Result<Self, Self::Rejection>
-    {
-        req.extensions()
-            .get::<CurrentUser>()
-            .cloned()
-            .ok_or_else(|| AppError::Business("User not authenticated".to_string()))
+impl CurrentUser {
+    pub async fn extract(depot: &mut Depot) -> Result<Self, AppError> {
+        if let Ok(current_user) = depot.get::<CurrentUser>("current_user") {
+            Ok(current_user.clone())
+        } else {
+            Err(AppError::Business("User not authenticated".to_string()))
+        }
     }
 }
