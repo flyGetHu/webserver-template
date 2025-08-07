@@ -8,6 +8,7 @@ use axum::{
     Json,
 };
 use serde::Serialize;
+use serde_json::Value;
 use tracing::error;
 use uuid::Uuid;
 
@@ -35,15 +36,17 @@ pub enum AppError {
     Internal(String),
 }
 
-/// 统一的API错误响应格式
+/// 统一的API响应格式（包括成功和错误）
 #[derive(Serialize)]
 pub struct ApiError {
-    /// 错误代码，0表示成功，非0表示各种错误
+    /// 响应代码，200表示成功，非200表示各种错误
     code: i32,
-    /// 错误消息
+    /// 响应消息
     message: String,
     /// 请求ID
     request_id: String,
+    /// 响应数据
+    data: Value,
 }
 
 impl AppError {
@@ -58,17 +61,19 @@ impl AppError {
                         code: 500,
                         message: msg.clone(),
                         request_id,
+                        data: Value::Null,
                     },
                 )
             }
             AppError::Validation(msg) => {
                 error!("Validation error: {}", msg);
                 (
-                    StatusCode::INTERNAL_SERVER_ERROR,
+                    StatusCode::BAD_REQUEST,
                     ApiError {
-                        code: 500,
+                        code: 400,
                         message: msg.clone(),
                         request_id,
+                        data: Value::Null,
                     },
                 )
             }
@@ -80,6 +85,7 @@ impl AppError {
                         code: 500,
                         message: "Internal server error".to_string(),
                         request_id,
+                        data: Value::Null,
                     },
                 )
             }
@@ -91,6 +97,7 @@ impl AppError {
                         code: 404,
                         message: msg.clone(),
                         request_id,
+                        data: Value::Null,
                     },
                 )
             }
@@ -102,6 +109,7 @@ impl AppError {
                         code: 500,
                         message: "Internal server error".to_string(),
                         request_id,
+                        data: Value::Null,
                     },
                 )
             }
@@ -130,7 +138,7 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         // 生成一个随机的request_id
         let request_id = Uuid::new_v4();
-        let (_, api_error) = self.to_api_error(request_id);
-        (StatusCode::OK, Json(api_error)).into_response()
+        let (status, api_error) = self.to_api_error(request_id);
+        (status, Json(api_error)).into_response()
     }
 }
