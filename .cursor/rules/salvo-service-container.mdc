@@ -1,0 +1,284 @@
+# Salvo Service Container Best Practices
+
+## Service Container Design Principles
+
+### 1. Simplicity Over Complexity
+- Prefer simple, direct service management over complex dependency injection frameworks
+- Use Salvo's Depot mechanism for request-scoped service access
+- Avoid over-engineering with complex type erasure patterns
+
+### 2. Service Container Structure
+```rust
+// Prefer this simple approach
+#[derive(Clone)]
+pub struct AppServices {
+    pub config: Arc<Config>,
+    pub app_state: Arc<AppState>,
+    pub user_repository: Arc<UserRepository>,
+    pub auth_service: Arc<AuthService>,
+    pub user_service: Arc<UserService>,
+}
+
+// Over complex type-erased containers
+pub struct ServiceRegistry {
+    services: HashMap<TypeId, Arc<dyn Any + Send + Sync>>,
+}
+```
+
+### 3. Service Injection Patterns
+
+#### Middleware-Based Injection
+```rust
+#[handler]
+pub async fn inject_services(
+    req: &mut Request,
+    depot: &mut Depot,
+    res: &mut Response,
+    ctrl: &mut FlowCtrl,
+) {
+    // Simple service injection into Depot
+    if let Some(services) = depot.get::<Arc<AppServices>>("app_services") {
+        depot.insert("user_service", services.user_service.clone());
+        depot.insert("auth_service", services.auth_service.clone());
+    }
+    
+    ctrl.call_next(req, depot, res).await;
+}
+```
+
+#### Handler Service Access
+```rust
+#[handler]
+pub async fn create_user(
+    req: &mut Request,
+    depot: &mut Depot,
+    res: &mut Response,
+) -> Result<(), AppError> {
+    // Direct service access from depot
+    let user_service = depot.get::<Arc<UserService>>("user_service")
+        .ok_or(AppError::Internal("User service not found".to_string()))?;
+    
+    // Use service
+    let result = user_service.create_user(payload).await?;
+    Ok(())
+}
+```
+
+## Service Lifecycle Management
+
+### 1. Service Creation Order
+```rust
+impl AppServices {
+    pub async fn new(config: Arc<Config>, app_state: Arc<AppState>) -> Self {
+        // Create services in dependency order
+        let user_repository = Arc::new(UserRepository::new(/* deps */));
+        let auth_service = Arc::new(AuthService::new(/* deps */));
+        let user_service = Arc::new(UserService::new(user_repository.clone(), /* deps */));
+        
+        Self {
+            config,
+            app_state,
+            user_repository,
+            auth_service,
+            user_service,
+        }
+    }
+}
+```
+
+### 2. Service Registration
+```rust
+// In main application setup
+let services = Arc::new(AppServices::new(config, app_state).await);
+
+let router = create_routes()
+    .hoop(inject_services) // Register injection middleware
+    .hoop(/* other middleware */);
+
+// Store services in application state for middleware access
+// Implementation depends on Salvo version and patterns
+```
+
+## Error Handling in Services
+
+### 1. Service Error Propagation
+```rust
+pub trait ServiceResult<T> {
+    fn into_app_error(self) -> Result<T, AppError>;
+}
+
+impl<T, E> ServiceResult<T> for Result<T, E>
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    fn into_app_error(self) -> Result<T, AppError> {
+        self.map_err(|e| AppError::Internal(e.to_string()))
+    }
+}
+```
+
+### 2. Service Method Patterns
+```rust
+impl UserService {
+    pub async fn create_user(&self, request: CreateUserRequest) -> Result<UserResponse, AppError> {
+        // Validate input
+        request.validate()
+            .map_err(|e| AppError::Validation(e.to_string()))?;
+        
+        // Check business rules
+        if self.user_repository.username_exists(&request.username).await? {
+            return Err(AppError::Business(409, "Username already exists".to_string()));
+        }
+        
+        // Perform operation
+        let user = self.user_repository.create(request).await?;
+        
+        // Return response
+        Ok(UserResponse::from(user))
+    }
+}
+```
+
+## Testing Service Container
+
+### 1. Mock Services for Testing
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    pub struct MockUserService;
+    
+    impl MockUserService {
+        pub fn new() -> Self {
+            Self
+        }
+        
+        pub async fn create_user(&self, _request: CreateUserRequest) -> Result<UserResponse, AppError> {
+            Ok(UserResponse {
+                id: 1,
+                username: "test_user".to_string(),
+                // ... other fields
+            })
+        }
+    }
+    
+    #[tokio::test]
+    async fn test_user_creation() {
+        let mock_service = Arc::new(MockUserService::new());
+        
+        // Test service logic
+        let result = mock_service.create_user(CreateUserRequest {
+            username: "test".to_string(),
+            email: "test@example.com".to_string(),
+        }).await;
+        
+        assert!(result.is_ok());
+    }
+}
+```
+
+### 2. Integration Testing with Services
+```rust
+#[tokio::test]
+async fn test_service_integration() {
+    let config = Arc::new(Config::load().unwrap());
+    let app_state = Arc::new(create_test_app_state().await);
+    let services = AppServices::new(config, app_state).await;
+    
+    // Test service interactions
+    let result = services.user_service.create_user(test_request).await;
+    assert!(result.is_ok());
+}
+```
+
+## Performance Considerations
+
+### 1. Service Cloning
+- Use `Arc<T>` for services to enable cheap cloning
+- Clone `Arc` references, not the underlying services
+- Services should be stateless or use internal synchronization
+
+### 2. Async Service Methods
+- All service methods should be async for consistency
+- Use `async fn` syntax for better ergonomics
+- Avoid blocking operations in async contexts
+
+### 3. Connection Pooling
+```rust
+pub struct UserRepository {
+    db_pool: Arc<MySqlPool>, // Use Arc for shared pools
+}
+
+impl UserRepository {
+    pub async fn create(&self, user_data: CreateUserDto) -> Result<User, AppError> {
+        let mut conn = self.db_pool.acquire().await
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        
+        // Use connection
+        // ...
+        
+        Ok(user)
+    }
+}
+```
+
+## Anti-Patterns to Avoid
+
+### 1. Complex Type Erasure
+```rust
+// AVOID: Complex type-erased service containers
+pub struct ServiceRegistry {
+    services: HashMap<TypeId, Arc<dyn Any + Send + Sync>>,
+}
+
+// PREFER: Simple, typed service containers
+pub struct AppServices {
+    pub user_service: Arc<UserService>,
+    pub auth_service: Arc<AuthService>,
+}
+```
+
+### 2. Global State
+```rust
+// AVOID: Global mutable state
+static mut GLOBAL_SERVICES: Option<AppServices> = None;
+
+// PREFER: Dependency injection through Salvo's Depot
+#[handler]
+pub async fn handler(depot: &mut Depot) {
+    let service = depot.get::<Arc<UserService>>("user_service").unwrap();
+}
+```
+
+### 3. Service Locator Pattern
+```rust
+// AVOID: Service locator anti-pattern
+pub struct ServiceLocator {
+    services: HashMap<String, Box<dyn Any>>,
+}
+
+// PREFER: Explicit dependency injection
+pub struct UserHandler {
+    user_service: Arc<UserService>,
+}
+```
+
+## Migration from Complex DI
+
+If migrating from a complex dependency injection system:
+
+1. **Start Simple**: Begin with a basic `AppServices` struct
+2. **Identify Dependencies**: Map out actual service dependencies
+3. **Remove Abstractions**: Eliminate unnecessary trait abstractions
+4. **Use Salvo Patterns**: Leverage Salvo's Depot for request-scoped access
+5. **Test Incrementally**: Ensure each service works independently
+
+## Summary
+
+- Keep service containers simple and typed
+- Use Salvo's Depot for request-scoped service access
+- Prefer composition over complex dependency injection
+- Make services stateless and async
+- Use Arc<T> for shared service instances
+- Test services independently and in integration

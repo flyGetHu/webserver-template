@@ -1,0 +1,55 @@
+---
+alwaysApply: true
+---
+
+# Project Structure and Architecture
+
+This is a Rust web server template using **Salvo** framework with a layered architecture pattern. The project follows enterprise-grade design principles with clear separation of concerns.
+
+## Core Architecture Layers
+
+### Entry Point
+- [main.rs](mdc:src/main.rs) - Application entry point, loads environment and starts the server
+- [app/mod.rs](mdc:src/app/mod.rs) - Main application module with `run()` function
+
+### Configuration and State
+- [app/config.rs](mdc:src/app/config.rs) - Configuration management using config-rs
+- [app/state.rs](mdc:src/app/state.rs) - Shared application state (database pools, etc.)
+- [config/default.toml](mdc:config/default.toml) - Default configuration values
+
+### API Layer (Presentation)
+- [app/api/](mdc:src/app/api/) - HTTP interface layer
+- [app/api/routes.rs](mdc:src/app/api/routes.rs) - Route definitions
+- [app/api/handlers/](mdc:src/app/api/handlers/) - HTTP request handlers
+- [app/api/middleware/](mdc:src/app/api/middleware/) - Custom middleware
+- [app/api/response.rs](mdc:src/app/api/response.rs) - Unified response structures
+
+### Domain Layer (Business Logic)
+- [app/domain/](mdc:src/app/domain/) - Core business logic
+- [app/domain/models/](mdc:src/app/domain/models/) - Domain entities
+- [app/domain/services/](mdc:src/app/domain/services/) - Business services
+
+### Infrastructure Layer
+- [app/infrastructure/](mdc:src/app/infrastructure/) - External integrations
+- [app/infrastructure/persistence/](mdc:src/app/infrastructure/persistence/) - Database repositories
+
+### Cross-Cutting Concerns
+- [app/error.rs](mdc:src/app/error.rs) - Unified error handling
+- [app/logging.rs](mdc:src/app/logging.rs) - Logging configuration
+- [app/container.rs](mdc:src/app/container.rs) - Dependency injection container
+
+## Key Design Principles
+
+1. **Layered Architecture**: API → Domain → Infrastructure
+2. **Dependency Injection**: Use the service container pattern
+3. **Unified Error Handling**: All errors flow through AppError
+4. **Structured Logging**: Request-scoped logging with request IDs
+5. **Configuration Management**: Environment-based config with TOML files
+
+## Module Organization Rules
+
+- Each layer should only depend on layers below it
+- Domain layer should be independent of external concerns
+- API handlers should be thin, delegating to domain services
+- Infrastructure implements interfaces defined in domain layer
+- All modules must be declared in their parent `mod.rs` file

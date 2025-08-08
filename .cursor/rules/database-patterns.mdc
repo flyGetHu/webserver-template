@@ -1,0 +1,178 @@
+---
+description: Database access patterns and repository design
+---
+
+# Database and Repository Patterns
+
+This project uses **SQLx** for database access with a repository pattern for data persistence. Database configuration is managed through [app/config.rs](mdc:src/app/config.rs) and connection pooling through [app/state.rs](mdc:src/app/state.rs).
+
+## Repository Pattern
+
+### Repository Structure
+- Place repositories in [app/infrastructure/persistence/](mdc:src/app/infrastructure/persistence/)
+- One repository per domain entity (e.g., `user_repository.rs`)
+- Implement repository traits defined in domain layer
+- Use dependency injection through service container
+
+### Repository Implementation Pattern
+```rust
+pub struct UserRepository {
+    pool: Arc<sqlx::MySqlPool>,
+}
+
+impl UserRepository {
+    pub fn new(pool: Arc<sqlx::MySqlPool>) -> Self {
+        Self { pool }
+    }
+    
+    pub async fn find_by_id(&self, id: i32) -> Result<Option<User>, AppError> {
+        sqlx::query_as!(
+            User,
+            "SELECT id, username, email, created_at FROM users WHERE id = ?",
+            id
+        )
+        .fetch_optional(&*self.pool)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))
+    }
+}
+```
+
+## Database Configuration
+
+### Connection Pool Management
+- Configure database URL in [config/default.toml](mdc:config/default.toml)
+- Create connection pool in [app/state.rs](mdc:src/app/state.rs)
+- Use `Arc<sqlx::MySqlPool>` for sharing across async contexts
+- Handle connection failures gracefully with fallback options
+
+### Migration Management
+- Store migrations in [migrations/](mdc:migrations/) directory
+- Use SQLx migration system: `sqlx migrate run`
+- Version migrations with sequential numbering
+- Include both up and down migration paths
+
+## Query Patterns
+
+### Compile-time Verified Queries
+```rust
+// Use query_as! for type-safe queries
+let user = sqlx::query_as!(
+    User,
+    "SELECT id, username, email FROM users WHERE id = ?",
+    user_id
+)
+.fetch_one(&pool)
+.await?;
+```
+
+### Dynamic Queries
+```rust
+// Use QueryBuilder for dynamic queries
+let mut query = QueryBuilder::new("SELECT * FROM users WHERE 1=1");
+
+if let Some(name) = filter.name {
+    query.push(" AND username LIKE ");
+    query.push_bind(format!("%{}%", name));
+}
+
+let users = query
+    .build_query_as::<User>()
+    .fetch_all(&pool)
+    .await?;
+```
+
+## Transaction Management
+
+### Repository Transactions
+```rust
+pub async fn create_user_with_profile(
+    &self,
+    user_data: CreateUser,
+    profile_data: CreateProfile,
+) -> Result<User, AppError> {
+    let mut tx = self.pool.begin().await?;
+    
+    let user = sqlx::query_as!(...)
+        .fetch_one(&mut *tx)
+        .await?;
+    
+    sqlx::query!(...)
+        .execute(&mut *tx)
+        .await?;
+    
+    tx.commit().await?;
+    Ok(user)
+}
+```
+
+### Service-Level Transactions
+- Pass transaction to multiple repository methods
+- Use `&mut sqlx::Transaction` parameter
+- Ensure all operations use the same transaction
+
+## Error Handling
+
+### Database Error Conversion
+```rust
+impl From<sqlx::Error> for AppError {
+    fn from(err: sqlx::Error) -> Self {
+        match err {
+            sqlx::Error::RowNotFound => AppError::NotFound("Resource not found".to_string()),
+            sqlx::Error::Database(db_err) => {
+                if db_err.is_unique_violation() {
+                    AppError::Conflict("Resource already exists".to_string())
+                } else {
+                    AppError::Database(db_err.to_string())
+                }
+            }
+            _ => AppError::Database(err.to_string()),
+        }
+    }
+}
+```
+
+### Constraint Handling
+- Convert unique constraint violations to business errors
+- Handle foreign key constraint violations appropriately
+- Provide meaningful error messages for constraint failures
+
+## Performance Considerations
+
+### Query Optimization
+- Use indexes for frequently queried columns
+- Limit result sets with LIMIT clauses
+- Use prepared statements (automatic with SQLx)
+- Monitor query performance in logs
+
+### Connection Pool Tuning
+- Configure appropriate pool size for workload
+- Set connection timeouts appropriately
+- Monitor pool utilization metrics
+- Use connection pool health checks
+
+## Redis Integration
+
+### Redis Repository Pattern
+- Similar structure to SQL repositories
+- Use connection pooling with `bb8-redis`
+- Implement caching strategies in repositories
+- Handle Redis failures gracefully with fallbacks
+
+### Cache-Aside Pattern
+```rust
+pub async fn get_user_cached(&self, id: i32) -> Result<User, AppError> {
+    // Try cache first
+    if let Ok(cached) = self.redis_repo.get_user(id).await {
+        return Ok(cached);
+    }
+    
+    // Fallback to database
+    let user = self.db_repo.find_by_id(id).await?;
+    
+    // Update cache
+    let _ = self.redis_repo.set_user(&user).await;
+    
+    Ok(user)
+}
+```

@@ -1,6 +1,6 @@
 # Rust Web Server Template
 
-This is a high-performance, modular Rust web server template project based on `axum`. It aims to provide a modern, enterprise-grade, and easy-to-use starting point for developers migrating from backgrounds like Java/Kotlin.
+This is a high-performance, modular Rust web server template project based on **Salvo**. It aims to provide a modern, enterprise-grade, and easy-to-use starting point for developers migrating from backgrounds like Java/Kotlin.
 
 ## Table of Contents
 
@@ -69,25 +69,27 @@ This is a high-performance, modular Rust web server template project based on `a
 
 | Component              | Crate          | Purpose                    | Rationale                                                                                             |
 | :--------------------- | :------------- | :------------------------- | :---------------------------------------------------------------------------------------------------- |
-| **Web Framework**      | `axum`         | HTTP Routing & Handling    | Developed by the Tokio team, it integrates seamlessly with the ecosystem, offering an elegant and modular design. |
+| **Web Framework**      | `salvo`        | HTTP Routing & Handling    | High-performance, modular web framework with excellent middleware support and OpenAPI integration. |
 | **Async Runtime**      | `tokio`        | Driving all async operations | The de-facto standard for async Rust, known for its stability and high performance.                   |
-| **ORM Framework**      | `sqlx`         | Async SQL Toolkit          | Purely asynchronous with compile-time SQL validation. High performance and type-safe. The top choice for modern Rust apps. |
+| **Database**           | `sqlx`         | Async SQL Toolkit          | Purely asynchronous with compile-time SQL validation. High performance and type-safe. The top choice for modern Rust apps. |
 | **Serialization**      | `serde`        | Data format handling (JSON) | The standard for serialization in the Rust community, powerful and performant.                        |
 | **Structured Logging** | `tracing`      | Application & Request Logs | Designed for async apps, providing structured, level-based logging crucial for debugging and monitoring. |
-| **HTTP Middleware**    | `tower-http`   | Common Middleware          | Provides essentials like `TraceLayer` (logging) and `CorsLayer`, working perfectly with `axum`.       |
 | **Configuration**      | `config-rs`    | Layered Configuration      | Merges settings from files (e.g., TOML) and environment variables, ideal for managing complex app configs. |
 | **Error Handling**     | `anyhow`       | Simplified Error Handling  | Provides an ergonomic and simple way to handle errors, avoiding extensive boilerplate code.           |
-| **Validation**         | `validator`    | Data Validation            | Enables declarative validation on structs, integrating smoothly with `axum`'s extractor system.       |
+| **Validation**         | `validator`    | Data Validation            | Enables declarative validation on structs, integrating smoothly with Salvo's handler system.       |
+| **OpenAPI/Swagger**    | `salvo-oapi`   | API Documentation          | Built-in OpenAPI support for automatic API documentation generation.                                 |
 
 ---
 
 ## 4. Enterprise-Grade Project Structure
 
-For long-term, collaborative projects, a layered architecture is recommended to clearly separate business logic from infrastructure, achieving "high cohesion, low coupling."
+This project adopts a **modular architecture** that combines the best of domain-driven design with Salvo's best practices, achieving "high cohesion, low coupling."
 
 ```
 .
 ├── .env              # (Optional) Local development environment overrides
+├── .cursor/          # Cursor IDE rules and configurations
+│   └── rules/        # Project-specific coding standards
 ├── config/
 │   ├── default.toml  # Default configuration
 │   └── production.toml # Production environment configuration
@@ -97,51 +99,97 @@ For long-term, collaborative projects, a layered architecture is recommended to 
 └── src/
     ├── main.rs       # (Binary Crate) Entry point: initializes and starts the server
     └── app/          # (Library Crate) Core application logic
-        ├── lib.rs        # Declares all modules, provides a `run()` function
+        ├── mod.rs        # Declares all modules, provides a `run()` function
         ├── config.rs     # Configuration loading and management
+        ├── container.rs  # Service container and dependency injection
         ├── error.rs      # Unified error handling type (AppError)
         ├── state.rs      # Shared application state (AppState)
         │
-        ├── api/          # API Layer (Web Interface)
+        ├── api/          # API Infrastructure Layer
         │   ├── mod.rs
-        │   ├── routes.rs   # Route definitions
-        │   ├── handlers/   # HTTP handler functions (grouped by domain)
+        │   ├── routes.rs     # Main route aggregation
+        │   ├── response.rs   # Unified response types
+        │   ├── docs.rs       # OpenAPI/Swagger documentation
+        │   ├── extractors.rs # Custom extractors for validation
+        │   ├── middleware/   # Cross-cutting concerns
         │   │   ├── mod.rs
-        │   │   └── user_handler.rs
-        │   └── middleware/ # Custom middleware (e.g., auth.rs)
-        │       └── mod.rs
+        │   │   ├── auth.rs
+        │   │   ├── request_id.rs
+        │   │   ├── request_logger.rs
+        │   │   └── global_exception_handler.rs
+        │   └── telemetry/    # Request tracing and monitoring
+        │       ├── mod.rs
+        │       └── request_id_format.rs
         │
-        ├── domain/       # Domain Layer (Core Business Logic)
+        ├── modules/      # Feature Modules (Domain-Driven)
         │   ├── mod.rs
-        │   ├── models/     # Domain models (e.g., User, Product)
+        │   ├── auth/         # Authentication module
+        │   │   ├── mod.rs
+        │   │   ├── handlers.rs   # HTTP handlers
+        │   │   ├── models.rs     # DTOs and request/response types
+        │   │   ├── routes.rs     # Module-specific routes
+        │   │   └── services.rs   # Business logic
+        │   ├── users/        # User management module
+        │   │   ├── mod.rs
+        │   │   ├── handlers.rs
+        │   │   ├── models.rs
+        │   │   ├── routes.rs
+        │   │   └── services.rs
+        │   └── health/       # Health check module
+        │       ├── mod.rs
+        │       └── handlers.rs
+        │
+        ├── domain/       # Shared Domain Layer
+        │   ├── mod.rs
+        │   ├── models/       # Core domain entities
         │   │   ├── mod.rs
         │   │   └── user.rs
-        │   └── services/   # Domain services (encapsulate business logic)
+        │   └── services/     # Shared domain services
         │       ├── mod.rs
+        │       ├── auth_service.rs
         │       └── user_service.rs
         │
         └── infrastructure/ # Infrastructure Layer
             ├── mod.rs
-            └── persistence/  # Persistence (Database)
+            └── persistence/  # Data persistence
                 ├── mod.rs
                 └── user_repository.rs
 ```
 
 ### Module Responsibilities
 
+#### Core Application
 -   **`main.rs`**: **Entry Point**. Its single responsibility is to call the `app` library to configure and launch the server.
--   **`app/lib.rs`**: **Application Core**. Declares all modules and provides a `run()` function for `main.rs`.
+-   **`app/mod.rs`**: **Application Core**. Declares all modules and provides a `run()` function for `main.rs`.
 -   **`app/config.rs`**: **Configuration**. Loads application config from `config/` files and environment variables using `config-rs`.
--   **`app/error.rs`**: **Error Handling**. Defines the unified `AppError` type and implements `IntoResponse`.
--   **`app/state.rs`**: **State Management**. Defines `AppState`, containing the database pool (`sqlx::PgPool`), config, and other shared resources.
--   **`app/api/`**: **API/Presentation Layer**. Handles HTTP requests and responses. It's the application's interface to the outside world.
-    -   `routes.rs`: Maps URL paths to specific `handler` functions.
-    -   `handlers/`: Contains `axum` handler functions. Their job is to parse requests, call domain services, and format responses. **They should not contain business logic**.
--   **`app/domain/`**: **Domain Layer**. Contains all core business logic and rules, **completely independent of external concerns** like databases or HTTP.
-    -   `models/`: Defines domain entities (pure Rust structs).
-    -   `services/`: Implements business use cases by orchestrating repositories and domain models.
--   **`app/infrastructure/`**: **Infrastructure Layer**. Provides concrete implementations for interacting with the outside world.
-    -   `persistence/`: Data persistence logic. Implements repository traits using `sqlx` to interact with the database.
+-   **`app/error.rs`**: **Error Handling**. Defines the unified `AppError` type and implements Salvo's `Scribe` trait.
+-   **`app/state.rs`**: **State Management**. Defines `AppState`, containing the database pool, Redis pool, and other shared resources.
+-   **`app/container.rs`**: **Service Container**. Manages dependency injection using Salvo's Depot mechanism for clean service management.
+
+#### API Infrastructure Layer (`app/api/`)
+Provides cross-cutting concerns and infrastructure for HTTP handling:
+-   **`routes.rs`**: Aggregates all module routes into the main application router.
+-   **`response.rs`**: Defines unified response types for consistent API responses.
+-   **`docs.rs`**: OpenAPI/Swagger documentation configuration.
+-   **`extractors.rs`**: Custom extractors for validation and data parsing.
+-   **`middleware/`**: Cross-cutting concerns like authentication, logging, and error handling.
+-   **`telemetry/`**: Request tracing and monitoring utilities.
+
+#### Feature Modules (`app/modules/`)
+Each module represents a business domain with complete encapsulation:
+-   **`handlers.rs`**: Salvo handlers that parse requests, call services, and format responses. **Should not contain business logic**.
+-   **`models.rs`**: DTOs, request/response types with validation rules using `validator`.
+-   **`routes.rs`**: Module-specific route definitions that wire handlers to URLs.
+-   **`services.rs`**: Business logic implementation specific to this module.
+
+#### Shared Domain Layer (`app/domain/`)
+Contains shared business logic and entities:
+-   **`models/`**: Core domain entities (pure Rust structs) shared across modules.
+-   **`services/`**: Shared domain services that implement complex business use cases.
+
+#### Infrastructure Layer (`app/infrastructure/`)
+Provides concrete implementations for external integrations:
+-   **`persistence/`**: Data persistence logic using `sqlx` for database interactions.
 
 ### Configuration Management
 
@@ -155,42 +203,47 @@ The `config-rs` crate enables a robust, layered configuration system:
 
 ## 5. Core Features & Design Patterns
 
-### 5.1. Middleware Design
+### 5.1. Modular Architecture
 
-All middleware should conform to the `tower::Layer` specification for seamless integration. The registration order is critical as it defines the request-response flow.
+This project adopts a **modular architecture** where each business domain is encapsulated in its own module. This approach provides:
+
+- **Domain Isolation**: Each module contains its own handlers, models, routes, and services
+- **Scalability**: Easy to add new features without affecting existing code
+- **Team Collaboration**: Different teams can work on different modules independently
+- **Maintainability**: Clear boundaries make the codebase easier to understand and maintain
+
+### 5.2. Salvo Middleware Design
+
+Salvo uses a powerful middleware system based on handlers. The registration order is critical as it defines the request-response flow.
 
 **Recommended Order:**
 
-1.  **Request ID Layer** (Outermost)
-2.  **CORS Layer**
-3.  **Logging Layer (`TraceLayer`)**
-4.  **Authentication & Authorization Layer**
-5.  **Global Exception Layer** (Innermost)
+1.  **Request ID Middleware** (Outermost)
+2.  **Service Injection Middleware**
+3.  **Request Logging Middleware**
+4.  **Authentication & Authorization Middleware** (Route-specific)
+5.  **Global Exception Handler** (Innermost)
 
 ```rust
-// Example: Registering global middleware in main.rs
-let app = Router::new()
-    .route("/", get(handler))
-    // ... other routes
-    .layer(
-        ServiceBuilder::new()
-            .layer(RequestIdLayer) // 1. Request ID
-            .layer(CorsLayer::new().allow_origin(Any)) // 2. CORS
-            .layer(TraceLayer::new_for_http()) // 3. Logging
-            // 4. Auth middleware is typically applied at the route level
-            .layer(GlobalExceptionLayer), // 5. Exception Handling
-    );
+// Example: Registering global middleware
+let router = create_routes()
+    .hoop(create_request_id_middleware()) // 1. Request ID
+    .hoop(request_id_handler) // 2. Request ID integration with tracing
+    .hoop(inject_services) // 3. Service injection
+    .hoop(request_logger) // 4. Request logging
+    .hoop(global_exception_handler); // 5. Exception handling
 ```
 
-### 5.2. Global Exception Handling & Unified Response
+### 5.3. Global Exception Handling & Unified Response
 
 This is the cornerstone of a robust and consistent API. All server responses, success or failure, must follow a unified structure.
 
 **Design Goals:**
 
--   Intercept all unhandled `Result::Err`.
+-   Intercept all unhandled `Result::Err` from handlers.
 -   Convert both business errors and system errors into a standard JSON format.
 -   Include a `request_id` in all responses for traceability.
+-   Integrate seamlessly with Salvo's error handling system.
 
 **Unified Response Body (JSON):**
 
@@ -215,135 +268,165 @@ This is the cornerstone of a robust and consistent API. All server responses, su
 **Implementation:**
 
 1.  **Define `AppError`**: Create an `AppError` enum in `src/app/error.rs` to represent all possible business and system errors.
-2.  **Implement `IntoResponse`**: Implement the `axum::response::IntoResponse` trait for `AppError`. This implementation maps error variants to the appropriate HTTP status codes and unified JSON response.
-3.  **Use in Handlers**: Simply return `Result<T, AppError>` from handlers. `axum` will automatically use the `IntoResponse` implementation when it encounters an `Err`.
+2.  **Implement `Scribe`**: Implement Salvo's `Scribe` trait for `AppError`. This trait defines how errors are rendered into HTTP responses.
+3.  **Use in Handlers**: Simply return `Result<T, AppError>` from handlers. Salvo will automatically use the `Scribe` implementation when it encounters an `Err`.
+4.  **Global Exception Middleware**: Use middleware to catch any unhandled errors and ensure consistent error formatting.
 
-### 5.3. Logging Middleware
+### 5.4. Logging Middleware
 
 Structured, request-bound logging is essential for debugging and monitoring.
 
 **Design Goals:**
 
 -   Log the entry and exit of every request.
--   Include key info: `HTTP Method`, `URI`, `Status Code`, `Latency`.
+-   Include key info: `HTTP Method`, `URI`, `Status Code`, `Latency`, `Client IP`.
 -   Crucially, associate every log entry with a `Request ID`.
+-   Integrate with Salvo's request/response lifecycle.
 
 **Implementation:**
 
--   Use `tower_http::trace::TraceLayer` combined with the `tracing` crate.
--   Configure `TraceLayer` to create a `span` at the beginning of a request and record information upon response, ensuring the `request_id` is included.
+-   Use custom middleware combined with the `tracing` crate.
+-   Create spans at the beginning of requests and record information upon response.
+-   Leverage Salvo's `Depot` to store and retrieve request-scoped data like request IDs.
 
-### 5.4. Flexible Authentication & Authorization
+### 5.5. Flexible Authentication & Authorization
 
-Different endpoints require different access control. This template provides a flexible, middleware-based mechanism to handle this.
+Different endpoints require different access control. This template provides a flexible, middleware-based mechanism using Salvo's powerful middleware system.
 
-**Core Design: `Auth` Middleware + `AuthStrategy` Trait**
+**Core Design: Salvo Middleware + Claims**
 
-The design revolves around an `AuthStrategy` trait, which defines the contract for any authentication method.
+The design leverages Salvo's `Depot` for storing authentication state and middleware for enforcement.
 
-1.  **`AuthStrategy` Trait**: The core abstraction for all authentication logic.
+1.  **`Claims` Structure**: Represents authenticated user information.
     ```rust
     // In: src/app/api/middleware/auth.rs
     #[derive(Debug, Clone)]
     pub struct Claims {
         pub user_id: i32,
+        pub username: String,
+        pub email: String,
         pub roles: Vec<String>,
     }
-
-    #[async_trait]
-    pub trait AuthStrategy: Clone + Send + Sync + 'static {
-        async fn authenticate(&self, req: &mut Request<Body>) -> Result<Claims, AppError>;
-    }
     ```
 
-2.  **Concrete Strategies (`JwtStrategy`, `ApiKeyStrategy`)**: Implement the `AuthStrategy` trait for each authentication method you need.
-
-3.  **`auth` Middleware**: A generic middleware that takes a strategy, executes it, and inserts the resulting `Claims` into request extensions.
-
-4.  **Applying to Routes**: Use `axum`'s `route_layer` to apply different authentication strategies to different routes or route groups.
+2.  **JWT Authentication Middleware**: Validates JWT tokens and extracts user claims.
     ```rust
-    // In: src/app/api/routes.rs
-    let jwt_strategy = JwtStrategy::new();
-    let user_routes = Router::new()
-        .route("/me", get(user_handler::get_me))
-        .route_layer(from_fn(move |req, next| {
-            auth(jwt_strategy.clone(), req, next)
-        }));
-    ```
-
-5.  **`CurrentUser` Extractor**: A custom extractor to ergonomically access the authenticated user's `Claims` in handlers.
-    ```rust
-    // In a handler:
-    pub async fn get_me(
-        CurrentUser(claims): CurrentUser, // Extracts claims if authenticated
-    ) -> Result<Json<Value>, AppError> {
-        // ... logic using claims.user_id
-        Ok(Json(json!({ "user_id": claims.user_id })))
-    }
-    ```
-
-### 5.5. Unified Request Validation
-
-Input validation is the first line of defense. This template uses a custom extractor built on `axum` and the `validator` crate for a clean, declarative approach.
-
-**Design Goals:**
-
--   **Declarative**: Define validation rules directly on DTO structs.
--   **Automatic**: Validation is triggered automatically by the extractor.
--   **Unified Response**: Failures automatically return a `400 Bad Request` with a consistent error format.
-
-**Implementation:**
-
-1.  **Define Rules on DTOs**: Use `#[derive(Validate)]` and validation attributes on the request body struct.
-    ```rust
-    // In: src/app/api/handlers/user_handler.rs
-    use serde::Deserialize;
-    use validator::Validate;
-
-    #[derive(Deserialize, Validate)]
-    pub struct CreateUserPayload {
-        #[validate(length(min = 3), required)]
-        pub username: Option<String>,
-        #[validate(email, required)]
-        pub email: Option<String>,
-    }
-    ```
-
-2.  **Create `ValidatedJson` Extractor**: A custom extractor that wraps `axum::Json`, deserializes, and then validates. If validation fails, it returns an `AppError::Validation`.
-    ```rust
-    // In: src/app/api/extractors.rs
-    #[derive(Debug, Clone, Copy, Default)]
-    pub struct ValidatedJson<T>(pub T);
-
-    #[async_trait]
-    impl<T, S> FromRequest<S> for ValidatedJson<T>
-    where
-        T: DeserializeOwned + Validate,
-        S: Send + Sync,
-    {
-        type Rejection = AppError;
-
-        async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
-            let Json(value) = Json::<T>::from_request(req, state)
-                .await
-                .map_err(|e| AppError::Validation(e.to_string()))?;
-            
-            value.validate().map_err(|e| AppError::Validation(e.to_string()))?;
-            
-            Ok(ValidatedJson(value))
+    #[handler]
+    pub async fn jwt_auth(
+        req: &mut Request,
+        depot: &mut Depot,
+        res: &mut Response,
+        ctrl: &mut FlowCtrl,
+    ) {
+        // Extract and validate JWT token
+        // Store claims in depot for handlers to access
+        if let Some(claims) = validate_jwt_token(req) {
+            depot.insert("current_user", claims);
+            ctrl.call_next(req, depot, res).await;
+        } else {
+            res.status_code(StatusCode::UNAUTHORIZED);
+            res.render(Json(json!({"error": "Unauthorized"})));
         }
     }
     ```
 
-3.  **Use in Handlers**: Simply replace `Json<T>` with `ValidatedJson<T>`. The handler code becomes cleaner, and validation is handled automatically.
+3.  **Applying to Routes**: Use Salvo's `.hoop()` method to apply authentication to specific routes.
+    ```rust
+    // In module routes
+    Router::with_path("users")
+        .hoop(jwt_auth) // Apply authentication
+        .get(list_users)
+        .post(create_user)
+    ```
+
+4.  **`CurrentUser` Extractor**: A custom extractor to access authenticated user information.
+    ```rust
+    // In a handler:
+    pub async fn get_me(depot: &mut Depot) -> Result<Json<UserResponse>, AppError> {
+        let current_user = depot.get::<Claims>("current_user")
+            .ok_or(AppError::Unauthorized("Not authenticated".to_string()))?;
+        
+        // ... logic using current_user
+        Ok(Json(user_response))
+    }
+    ```
+
+### 5.6. Unified Request Validation
+
+Input validation is the first line of defense. This template uses the `validator` crate integrated with Salvo's request parsing for a clean, declarative approach.
+
+**Design Goals:**
+
+-   **Declarative**: Define validation rules directly on DTO structs using attributes.
+-   **Automatic**: Validation is triggered automatically during request parsing.
+-   **Unified Response**: Failures automatically return a `400 Bad Request` with a consistent error format.
+-   **OpenAPI Integration**: Validation rules are automatically reflected in OpenAPI documentation.
+
+**Implementation:**
+
+1.  **Define Rules on DTOs**: Use `#[derive(Validate)]` and validation attributes on request structs.
+    ```rust
+    // In: src/app/modules/users/models.rs
+    use serde::Deserialize;
+    use salvo::oapi::ToSchema;
+    use validator::Validate;
+
+    #[derive(Deserialize, Validate, ToSchema)]
+    pub struct CreateUserRequest {
+        #[validate(length(min = 3, max = 50))]
+        pub username: String,
+        
+        #[validate(email)]
+        pub email: String,
+        
+        #[validate(range(min = 18, max = 120))]
+        pub age: Option<i32>,
+    }
+    ```
+
+2.  **Validation in Handlers**: Use Salvo's built-in JSON parsing with manual validation.
     ```rust
     // In a handler:
     pub async fn create_user(
-        ValidatedJson(payload): ValidatedJson<CreateUserPayload>,
-    ) -> Result<Json<Value>, AppError> {
-        // If execution reaches here, payload is valid.
+        req: &mut Request,
+        depot: &mut Depot,
+        res: &mut Response,
+    ) -> Result<(), AppError> {
+        let payload = req
+            .parse_json::<CreateUserRequest>()
+            .await
+            .map_err(|e| AppError::Validation(e.to_string()))?;
+        
+        // Validate the payload
+        payload.validate()
+            .map_err(|e| AppError::Validation(e.to_string()))?;
+        
+        // If execution reaches here, payload is valid
         // ... business logic
-        Ok(Json(json!({ "status": "success" })))
+        Ok(())
+    }
+    ```
+
+3.  **Custom Extractor (Optional)**: For more ergonomic usage, create a custom validated extractor.
+    ```rust
+    // In: src/app/api/extractors.rs
+    pub struct ValidatedJson<T>(pub T);
+
+    impl<T> ValidatedJson<T>
+    where
+        T: DeserializeOwned + Validate,
+    {
+        pub async fn extract(req: &mut Request) -> Result<Self, AppError> {
+            let value = req
+                .parse_json::<T>()
+                .await
+                .map_err(|e| AppError::Validation(e.to_string()))?;
+            
+            value.validate()
+                .map_err(|e| AppError::Validation(e.to_string()))?;
+            
+            Ok(ValidatedJson(value))
+        }
     }
     ```
 
@@ -351,27 +434,144 @@ Input validation is the first line of defense. This template uses a custom extra
 
 ## 6. Development Guide
 
-### How to Add a New API Endpoint
+### How to Add a New Feature Module
 
-Follow the existing layered architecture to add a new feature (e.g., a "products" feature).
+Follow the modular architecture to add a new feature (e.g., a "products" feature).
 
-1.  **Domain Layer (`/domain`)**:
-    -   Define your core business model in `src/app/domain/models/product.rs`.
-    -   (Optional) If there's complex business logic, create a `src/app/domain/services/product_service.rs`.
+1.  **Create Module Directory**:
+    ```bash
+    mkdir src/app/modules/products
+    ```
 
-2.  **Infrastructure Layer (`/infrastructure`)**:
-    -   Implement the database logic in `src/app/infrastructure/persistence/product_repository.rs`. Define how to create, read, update, or delete products in the database.
+2.  **Create Module Files**:
+    ```bash
+    # Core module files
+    touch src/app/modules/products/mod.rs
+    touch src/app/modules/products/handlers.rs
+    touch src/app/modules/products/models.rs
+    touch src/app/modules/products/routes.rs
+    touch src/app/modules/products/services.rs
+    ```
 
-3.  **API Layer (`/api`)**:
-    -   Define the request/response DTOs (Data Transfer Objects) and implement validation rules in `src/app/api/handlers/product_handler.rs`.
-    -   Create the handler functions in the same file. Handlers should:
-        a. Use extractors (`State`, `Path`, `ValidatedJson`) to get data.
-        b. Call the appropriate domain service or repository.
-        c. Convert the result into a `Result<Json<...>, AppError>`.
-    -   Wire up the new routes in `src/app/api/routes.rs`.
+3.  **Define Models** (`src/app/modules/products/models.rs`):
+    ```rust
+    use serde::{Deserialize, Serialize};
+    use salvo::oapi::ToSchema;
+    use validator::Validate;
 
-4.  **Register Modules**:
-    -   Ensure all new modules (`product.rs`, `product_handler.rs`, etc.) are correctly declared in their parent `mod.rs` file.
+    #[derive(Deserialize, Validate, ToSchema)]
+    pub struct CreateProductRequest {
+        #[validate(length(min = 1, max = 100))]
+        pub name: String,
+        
+        #[validate(length(max = 500))]
+        pub description: Option<String>,
+        
+        #[validate(range(min = 0.01))]
+        pub price: f64,
+    }
+
+    #[derive(Serialize, ToSchema)]
+    pub struct ProductResponse {
+        pub id: i32,
+        pub name: String,
+        pub description: Option<String>,
+        pub price: f64,
+        pub created_at: String,
+    }
+    ```
+
+4.  **Implement Handlers** (`src/app/modules/products/handlers.rs`):
+    ```rust
+    use salvo::prelude::*;
+    use crate::app::{
+        api::response::ApiResponse,
+        error::AppError,
+        modules::products::models::*,
+    };
+
+    #[handler]
+    pub async fn create_product(
+        req: &mut Request,
+        depot: &mut Depot,
+        res: &mut Response,
+    ) -> Result<(), AppError> {
+        let request_id = depot.get::<String>("request_id").cloned()
+            .unwrap_or_else(|| "unknown".to_string());
+
+        let payload = req
+            .parse_json::<CreateProductRequest>()
+            .await
+            .map_err(|e| AppError::Validation(e.to_string()))?;
+
+        payload.validate()
+            .map_err(|e| AppError::Validation(e.to_string()))?;
+
+        // TODO: Implement business logic
+        let response = ProductResponse {
+            id: 1,
+            name: payload.name,
+            description: payload.description,
+            price: payload.price,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+        };
+
+        res.render(Json(ApiResponse::new(response, request_id)));
+        Ok(())
+    }
+    ```
+
+5.  **Define Routes** (`src/app/modules/products/routes.rs`):
+    ```rust
+    use salvo::prelude::*;
+    use super::handlers::{create_product};
+
+    pub fn create_routes() -> Router {
+        Router::with_path("products")
+            .post(create_product)
+    }
+    ```
+
+6.  **Register Module** (`src/app/modules/mod.rs`):
+    ```rust
+    pub mod auth;
+    pub mod health;
+    pub mod users;
+    pub mod products; // Add new module
+
+    // Update create_routes function
+    pub fn create_routes() -> Router {
+        Router::with_path("api/v1")
+            .push(auth::create_routes())
+            .push(users::create_routes())
+            .push(products::create_routes()) // Add new routes
+            .push(health::create_routes())
+    }
+    ```
+
+7.  **Add Domain Logic** (if needed):
+    -   For shared domain entities: `src/app/domain/models/product.rs`
+    -   For complex business logic: `src/app/domain/services/product_service.rs`
+    -   For data persistence: `src/app/infrastructure/persistence/product_repository.rs`
+
+### Service Container Integration
+
+To integrate with the service container for dependency injection:
+
+1.  **Update Container** (`src/app/container.rs`):
+    ```rust
+    pub struct AppServices {
+        // ... existing services
+        pub product_service: Arc<ProductService>,
+    }
+    ```
+
+2.  **Use in Handlers**:
+    ```rust
+    // Get service from depot (when properly integrated)
+    let product_service = depot.get_product_service()?;
+    let result = product_service.create_product(payload).await?;
+    ```
 
 ---
 

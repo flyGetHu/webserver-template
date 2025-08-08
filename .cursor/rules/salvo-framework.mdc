@@ -1,0 +1,131 @@
+---
+description: Guidelines for using Salvo web framework
+---
+
+# Salvo Framework Guidelines
+
+This project uses **Salvo** as the web framework. Salvo is a modern, high-performance Rust web framework with built-in features for middleware, routing, and OpenAPI documentation.
+
+## Project Architecture
+
+This project follows a **modular architecture** where business domains are organized into self-contained modules under `src/app/modules/`. Each module contains:
+- `handlers.rs` - HTTP request handlers
+- `models.rs` - DTOs and request/response types with validation
+- `routes.rs` - Module-specific route definitions
+- `services.rs` - Business logic implementation
+
+## Router and Route Definitions
+
+- Main route aggregation in [app/api/routes.rs](mdc:src/app/api/routes.rs)
+- Module-specific routes in each module's `routes.rs` file
+- Use `Router::with_path()` to create route groups
+- Organize routes by business domain (auth, users, products, etc.)
+- Use descriptive route paths with proper HTTP methods
+
+```rust
+// Module route structure (e.g., src/app/modules/users/routes.rs)
+pub fn create_routes() -> Router {
+    Router::with_path("users")
+        .get(list_users)
+        .post(create_user)
+        .push(
+            Router::with_path("{id}")
+                .get(get_user)
+                .patch(update_user)
+                .delete(delete_user)
+        )
+}
+
+// Main route aggregation (src/app/api/routes.rs)
+pub fn create_routes() -> Router {
+    Router::new()
+        .push(modules::create_routes()) // Aggregates all module routes
+        .push(docs::create_swagger_routes())
+}
+```
+
+## Handler Functions
+
+- Place handlers in each module's `handlers.rs` file (e.g., `src/app/modules/users/handlers.rs`)
+- Use `#[handler]` attribute for Salvo handlers
+- Standard signature: `req: &mut Request, depot: &mut Depot, res: &mut Response`
+- Return `Result<(), AppError>` for error handling integration
+- Use OpenAPI attributes for documentation
+
+```rust
+// Handler signature pattern with OpenAPI documentation
+#[handler]
+pub async fn create_user(
+    req: &mut Request,
+    depot: &mut Depot,
+    res: &mut Response,
+) -> Result<(), AppError> {
+    let request_id = depot.get::<String>("request_id").cloned()
+        .unwrap_or_else(|| "unknown".to_string());
+
+    let payload = req
+        .parse_json::<CreateUserRequest>()
+        .await
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+
+    // Validate payload
+    payload.validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+
+    // Business logic here
+    let response = UserResponse { /* ... */ };
+
+    res.render(Json(ApiResponse::new(response, request_id)));
+    Ok(())
+}
+```
+
+## Middleware (Hoops)
+
+- Use `.hoop()` method to add middleware to routes
+- Apply middleware in correct order (see [app/mod.rs](mdc:src/app/mod.rs))
+- Create custom middleware in [app/api/middleware/](mdc:src/app/api/middleware/)
+- Use `Handler` trait for custom middleware
+
+```rust
+// Middleware application order
+let router = create_routes()
+    .hoop(request_id_middleware())
+    .hoop(add_request_id)
+    .hoop(global_exception_handler);
+```
+
+## Request/Response Patterns
+
+- Use Salvo's built-in extractors for request data
+- Leverage [app/api/response.rs](mdc:src/app/api/response.rs) for unified responses
+- Use `res.render()` to send responses
+- Handle JSON with Salvo's built-in JSON support
+
+## OpenAPI Documentation
+
+- Salvo has built-in OpenAPI support
+- Use `#[oapi(...)]` attributes for API documentation
+- Configure OpenAPI in route setup
+- Serve documentation at `/docs` endpoint
+
+## Error Handling Integration
+
+- Integrate with [app/error.rs](mdc:src/app/error.rs) AppError system
+- Use global exception handler middleware
+- Convert Salvo errors to AppError when needed
+- Maintain consistent error response format
+
+## State Management
+
+- Access shared state through Salvo's `Depot`
+- Store [app/state.rs](mdc:src/app/state.rs) AppState in depot
+- Use dependency injection pattern with service container
+- Share database pools and configuration through state
+
+## Security Features
+
+- Use Salvo's built-in CORS support
+- Implement authentication middleware
+- Leverage request ID middleware for tracing
+- Use Salvo's compression features for performance

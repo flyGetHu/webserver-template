@@ -1,0 +1,260 @@
+---
+globs: *test*.rs,tests/**/*.rs
+---
+
+# Testing Guidelines and Patterns
+
+This project follows comprehensive testing practices with unit tests, integration tests, and mocking strategies for external dependencies.
+
+## Test Organization
+
+### Unit Tests
+- Place unit tests in the same file using `#[cfg(test)]` module
+- Test individual functions and methods in isolation
+- Mock external dependencies (database, Redis, HTTP clients)
+- Focus on business logic and edge cases
+
+### Integration Tests
+- Place integration tests in `tests/` directory
+- Test complete request/response cycles
+- Use test database and Redis instances
+- Test middleware and error handling flows
+
+### Test File Structure
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio_test;
+    
+    #[tokio::test]
+    async fn test_function_name() {
+        // Arrange
+        let input = setup_test_data();
+        
+        // Act
+        let result = function_under_test(input).await;
+        
+        // Assert
+        assert!(result.is_ok());
+    }
+}
+```
+
+## Testing Async Code
+
+### Async Test Setup
+```rust
+#[tokio::test]
+async fn test_async_function() {
+    // Use tokio::test for async tests
+    let result = async_function().await;
+    assert_eq!(result, expected_value);
+}
+```
+
+### Testing with Timeouts
+```rust
+#[tokio::test]
+async fn test_with_timeout() {
+    let result = tokio::time::timeout(
+        Duration::from_secs(5),
+        long_running_function()
+    ).await;
+    
+    assert!(result.is_ok());
+}
+```
+
+## Database Testing
+
+### Test Database Setup
+- Use separate test database or in-memory SQLite
+- Run migrations before tests
+- Clean up data between tests
+- Use transactions that rollback for isolation
+
+### Repository Testing Pattern
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sqlx::SqlitePool;
+    
+    async fn setup_test_db() -> SqlitePool {
+        let pool = SqlitePool::connect(":memory:").await.unwrap();
+        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+        pool
+    }
+    
+    #[tokio::test]
+    async fn test_create_user() {
+        let pool = setup_test_db().await;
+        let repo = UserRepository::new(Arc::new(pool));
+        
+        let user_data = CreateUser {
+            username: "test_user".to_string(),
+            email: "test@example.com".to_string(),
+        };
+        
+        let result = repo.create_user(user_data).await;
+        assert!(result.is_ok());
+    }
+}
+```
+
+## Mocking External Dependencies
+
+### HTTP Client Mocking
+```rust
+use mockito::{mock, server_url};
+
+#[tokio::test]
+async fn test_external_api_call() {
+    let _m = mock("GET", "/api/data")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(r#"{"status": "success"}"#)
+        .create();
+    
+    let client = HttpClient::new(&server_url());
+    let result = client.fetch_data().await;
+    
+    assert!(result.is_ok());
+}
+```
+
+### Database Mocking
+```rust
+use mockall::predicate::*;
+
+#[tokio::test]
+async fn test_service_with_mock_repo() {
+    let mut mock_repo = MockUserRepository::new();
+    mock_repo
+        .expect_find_by_id()
+        .with(eq(1))
+        .times(1)
+        .returning(|_| Ok(Some(test_user())));
+    
+    let service = UserService::new(Arc::new(mock_repo));
+    let result = service.get_user(1).await;
+    
+    assert!(result.is_ok());
+}
+```
+
+## API Testing
+
+### Handler Testing
+```rust
+use salvo::test::{ResponseExt, TestClient};
+
+#[tokio::test]
+async fn test_create_user_handler() {
+    let app = create_test_app().await;
+    let client = TestClient::new(app);
+    
+    let response = client
+        .post("/api/v1/users")
+        .json(&json!({
+            "username": "testuser",
+            "email": "test@example.com"
+        }))
+        .send()
+        .await;
+    
+    assert_eq!(response.status(), 201);
+    let body: ApiResponse<User> = response.json().await;
+    assert_eq!(body.code, 0);
+}
+```
+
+### Middleware Testing
+```rust
+#[tokio::test]
+async fn test_auth_middleware() {
+    let app = Router::new()
+        .push(Router::with_path("/protected").get(protected_handler))
+        .hoop(auth_middleware);
+    
+    let client = TestClient::new(app);
+    
+    // Test without token
+    let response = client.get("/protected").send().await;
+    assert_eq!(response.status(), 401);
+    
+    // Test with valid token
+    let response = client
+        .get("/protected")
+        .header("Authorization", "Bearer valid_token")
+        .send()
+        .await;
+    assert_eq!(response.status(), 200);
+}
+```
+
+## Test Data Management
+
+### Test Fixtures
+```rust
+pub fn create_test_user() -> User {
+    User {
+        id: 1,
+        username: "testuser".to_string(),
+        email: "test@example.com".to_string(),
+        created_at: chrono::Utc::now(),
+    }
+}
+
+pub fn create_test_users(count: usize) -> Vec<User> {
+    (1..=count).map(|i| User {
+        id: i as i32,
+        username: format!("user{}", i),
+        email: format!("user{}@example.com", i),
+        created_at: chrono::Utc::now(),
+    }).collect()
+}
+```
+
+### Database Seeding
+```rust
+pub async fn seed_test_data(pool: &SqlitePool) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        "INSERT INTO users (username, email) VALUES (?, ?)",
+        "testuser",
+        "test@example.com"
+    )
+    .execute(pool)
+    .await?;
+    
+    Ok(())
+}
+```
+
+## Performance Testing
+
+### Load Testing
+- Use tools like `criterion` for benchmarking
+- Test critical paths under load
+- Measure database query performance
+- Profile memory usage and allocations
+
+### Benchmark Example
+```rust
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+
+fn benchmark_user_creation(c: &mut Criterion) {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    
+    c.bench_function("create_user", |b| {
+        b.to_async(&rt).iter(|| async {
+            let result = create_user_service(black_box(test_data())).await;
+            black_box(result)
+        })
+    });
+}
+
+criterion_group!(benches, benchmark_user_creation);
+criterion_main!(benches);
+```

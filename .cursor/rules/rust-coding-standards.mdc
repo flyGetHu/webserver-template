@@ -1,0 +1,72 @@
+---
+globs: *.rs
+---
+
+# Rust Coding Standards and Conventions
+
+## Code Style and Formatting
+
+- Use `cargo fmt` for consistent formatting
+- Follow Rust naming conventions:
+  - `snake_case` for functions, variables, modules
+  - `PascalCase` for types, structs, enums
+  - `SCREAMING_SNAKE_CASE` for constants
+  - `kebab-case` for crate names
+
+## Documentation Standards
+
+- Add doc comments (`///`) for all public functions, structs, and modules
+- Include examples in doc comments when helpful
+- Use `//!` for module-level documentation
+- Document error conditions and panics
+
+## Error Handling
+
+- Use `Result<T, AppError>` for all fallible operations
+- Prefer `?` operator over explicit error handling
+- Use `anyhow::Result` only in main.rs and top-level functions
+- Convert external errors to `AppError` at boundaries
+
+## Async/Await Patterns
+
+- Use `async fn` for all I/O operations
+- Prefer `tokio::spawn` for concurrent tasks
+- Use `Arc` for shared state across async boundaries
+- Avoid blocking operations in async contexts
+
+## Memory Management
+
+- Prefer owned types over references when crossing async boundaries
+- Use `Arc<T>` for shared immutable data
+- Use `Arc<Mutex<T>>` or `Arc<RwLock<T>>` for shared mutable data
+- Clone `Arc` instead of passing references to async functions
+
+## Dependency Management
+
+- Group dependencies logically in Cargo.toml
+- Use specific version numbers, avoid wildcards
+- Enable only needed features to reduce compile time
+- Document why each dependency is needed
+
+## Testing Conventions
+
+- Place unit tests in the same file using `#[cfg(test)]`
+- Use descriptive test function names
+- Follow AAA pattern: Arrange, Act, Assert
+- Use `tokio::test` for async tests
+- Mock external dependencies in tests
+
+## Performance Considerations
+
+- Use `&str` over `String` when possible
+- Prefer iterators over collecting to vectors
+- Use `Box<dyn Trait>` for trait objects
+- Consider `Cow<str>` for conditional ownership
+
+## Security Best Practices
+
+- Validate all input at API boundaries
+- Use secure random generation for tokens
+- Hash passwords with appropriate algorithms
+- Sanitize data before database operations
+- Log security events appropriately

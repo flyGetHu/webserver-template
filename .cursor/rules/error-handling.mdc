@@ -1,0 +1,125 @@
+---
+description: Error handling and unified response patterns
+---
+
+# Error Handling and Response Patterns
+
+This project implements a unified error handling system through [app/error.rs](mdc:src/app/error.rs) and standardized response formats in [app/api/response.rs](mdc:src/app/api/response.rs).
+
+## AppError System
+
+### Error Types
+- **Business Errors**: Domain-specific errors with custom codes
+- **Validation Errors**: Input validation failures
+- **Database Errors**: SQLx and database-related errors
+- **External Service Errors**: Third-party API failures
+- **System Errors**: Internal server errors
+
+### Error Conversion Pattern
+```rust
+// Convert external errors to AppError at boundaries
+impl From<sqlx::Error> for AppError {
+    fn from(err: sqlx::Error) -> Self {
+        AppError::Database(err.to_string())
+    }
+}
+```
+
+## Unified Response Format
+
+### Success Response Structure
+```json
+{
+  "code": 0,
+  "message": "Success",
+  "data": { ... },
+  "request_id": "uuid-v4-string"
+}
+```
+
+### Error Response Structure
+```json
+{
+  "code": 1001,
+  "message": "Error description",
+  "request_id": "uuid-v4-string"
+}
+```
+
+## Handler Error Patterns
+
+### Standard Handler Return Type
+```rust
+pub async fn handler_name(req: &mut Request, res: &mut Response) -> Result<(), AppError> {
+    // Business logic that may fail
+    let result = service.do_something().await?;
+    
+    // Success response
+    res.render(Json(ApiResponse::success(result)));
+    Ok(())
+}
+```
+
+### Error Propagation
+- Use `?` operator to propagate errors up the call stack
+- Convert external errors to `AppError` at service boundaries
+- Let global exception handler format final error responses
+
+## Validation Error Handling
+
+### Input Validation
+- Validate request data using `validator` crate
+- Return `AppError::Validation` for validation failures
+- Include field-specific error messages
+
+### Custom Validation
+```rust
+if username.len() < 3 {
+    return Err(AppError::Validation("Username must be at least 3 characters".to_string()));
+}
+```
+
+## Database Error Handling
+
+### Repository Pattern
+```rust
+impl UserRepository {
+    pub async fn create_user(&self, user: CreateUser) -> Result<User, AppError> {
+        sqlx::query_as!(...)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| AppError::Database(e.to_string()))
+    }
+}
+```
+
+### Transaction Error Handling
+- Use `sqlx::Transaction` for atomic operations
+- Rollback automatically on error return
+- Convert constraint violations to meaningful business errors
+
+## Logging Error Context
+
+### Error Logging Strategy
+- Log errors at the point where they're handled
+- Include request ID for traceability
+- Use appropriate log levels (error, warn, info)
+- Don't log the same error multiple times
+
+### Structured Error Logging
+```rust
+tracing::error!(
+    request_id = %request_id,
+    error = %err,
+    "Failed to create user"
+);
+```
+
+## Global Exception Handler
+
+The [global exception handler](mdc:src/app/api/middleware/global_exception_handler.rs) middleware:
+- Catches all unhandled `AppError` instances
+- Converts them to appropriate HTTP status codes
+- Formats consistent JSON error responses
+- Includes request ID for tracing
+- Logs errors with appropriate context

@@ -140,3 +140,9 @@ impl Scribe for AppError {
         res.render(Json(api_error));
     }
 }
+
+impl salvo::prelude::EndpointOutRegister for AppError {
+    fn register(_components: &mut salvo::oapi::Components, _operation: &mut salvo::oapi::Operation) {
+        // No-op implementation for error types
+    }
+}
