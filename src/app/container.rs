@@ -113,7 +113,7 @@ macro_rules! get_service {
             .get::<Arc<$service_type>>($service_name)
             .map(|s| s.clone())
             .map_err(|_| {
-                crate::app::error::AppError::Internal(format!(
+                $crate::app::error::AppError::Internal(format!(
                     "Service {} not found in depot",
                     $service_name
                 ))

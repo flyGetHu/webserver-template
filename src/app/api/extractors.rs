@@ -24,7 +24,7 @@ where
 
         value
             .validate()
-            .map_err(|e| AppError::Validation(format!("Validation failed: {}", e)))?;
+            .map_err(|e| AppError::Validation(format!("Validation failed: {e}")))?;
 
         Ok(ValidatedJson(value))
     }

@@ -39,7 +39,7 @@ impl AuthService {
         .bind(&user_data.email)
         .fetch_optional(self.db_pool.as_ref())
         .await
-        .map_err(|e| AppError::Database(e))?;
+        .map_err(AppError::Database)?;
 
         if existing_user.is_some() {
             return Err(AppError::Business("Username or email already exists".to_string()));
@@ -63,14 +63,14 @@ impl AuthService {
         .bind(true)
         .execute(self.db_pool.as_ref())
         .await
-        .map_err(|e| AppError::Database(e))?;
+        .map_err(AppError::Database)?;
 
         let user_id = result.last_insert_id() as i32;
         let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = ?")
             .bind(user_id)
             .fetch_one(self.db_pool.as_ref())
             .await
-            .map_err(|e| AppError::Database(e))?;
+            .map_err(AppError::Database)?;
 
         Ok(user)
     }
@@ -85,7 +85,7 @@ impl AuthService {
         .bind(&login_data.username_or_email)
         .fetch_optional(self.db_pool.as_ref())
         .await
-        .map_err(|e| AppError::Database(e))?;
+        .map_err(AppError::Database)?;
 
         let user = user.ok_or_else(|| {
             AppError::Business("Invalid username/email or password".to_string())
@@ -178,7 +178,7 @@ impl AuthService {
             .bind(user_id)
             .fetch_optional(self.db_pool.as_ref())
             .await
-            .map_err(|e| AppError::Database(e))?;
+            .map_err(AppError::Database)?;
 
         Ok(user)
     }

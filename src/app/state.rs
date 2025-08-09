@@ -78,7 +78,7 @@ pub async fn create_mock_redis_pool() -> Result<RedisPool, bb8::RunError<redis::
 
     // 创建一个模拟的Redis管理器
     let manager = RedisConnectionManager::new("redis://192.168.100.149:6379/")
-        .map_err(|e| bb8::RunError::User(e))?;
+        .map_err(bb8::RunError::User)?;
 
     let pool = bb8::Pool::builder().build(manager).await?;
     info!("Mock Redis pool created successfully");

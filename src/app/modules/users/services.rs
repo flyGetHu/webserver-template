@@ -67,8 +67,8 @@ impl UserService {
 
         Ok(UserResponse {
             id,
-            username: format!("user{}", id),
-            email: format!("user{}@example.com", id),
+            username: format!("user{id}"),
+            email: format!("user{id}@example.com"),
             age: Some(25),
             created_at: "2024-01-01T00:00:00Z".to_string(),
             updated_at: "2024-01-01T00:00:00Z".to_string(),
@@ -80,7 +80,7 @@ impl UserService {
         // 验证请求数据
         request
             .validate()
-            .map_err(|e| AppError::Validation(format!("Validation failed: {}", e)))?;
+            .map_err(|e| AppError::Validation(format!("Validation failed: {e}")))?;
 
         // TODO: 实际的创建逻辑
         // 1. 检查用户名和邮箱是否已存在
@@ -107,7 +107,7 @@ impl UserService {
         // 验证请求数据
         request
             .validate()
-            .map_err(|e| AppError::Validation(format!("Validation failed: {}", e)))?;
+            .map_err(|e| AppError::Validation(format!("Validation failed: {e}")))?;
 
         // TODO: 实际的更新逻辑
         // 1. 检查用户是否存在
@@ -121,10 +121,10 @@ impl UserService {
 
         Ok(UserResponse {
             id,
-            username: request.username.unwrap_or_else(|| format!("user{}", id)),
+            username: request.username.unwrap_or_else(|| format!("user{id}")),
             email: request
                 .email
-                .unwrap_or_else(|| format!("user{}@example.com", id)),
+                .unwrap_or_else(|| format!("user{id}@example.com")),
             age: request.age,
             created_at: "2024-01-01T00:00:00Z".to_string(),
             updated_at: "2024-01-01T00:00:00Z".to_string(),

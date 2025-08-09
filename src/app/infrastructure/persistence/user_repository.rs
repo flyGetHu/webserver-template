@@ -35,7 +35,7 @@ impl UserRepository {
             .bind(true)
             .execute(self.db_pool.as_ref())
             .await
-            .map_err(|e| AppError::Database(e))?;
+            .map_err(AppError::Database)?;
 
         let user_id = result.last_insert_id() as i32;
         self.find_by_id(user_id).await?.ok_or(AppError::NotFound("User not found".to_string()))
@@ -48,7 +48,7 @@ impl UserRepository {
             .bind(id)
             .fetch_optional(self.db_pool.as_ref())
             .await
-            .map_err(|e| AppError::Database(e))?;
+            .map_err(AppError::Database)?;
 
         Ok(user)
     }
@@ -60,7 +60,7 @@ impl UserRepository {
             .bind(username)
             .fetch_optional(self.db_pool.as_ref())
             .await
-            .map_err(|e| AppError::Database(e))?;
+            .map_err(AppError::Database)?;
 
         Ok(user)
     }
@@ -72,7 +72,7 @@ impl UserRepository {
             .bind(email)
             .fetch_optional(self.db_pool.as_ref())
             .await
-            .map_err(|e| AppError::Database(e))?;
+            .map_err(AppError::Database)?;
 
         Ok(user)
     }
@@ -85,7 +85,7 @@ impl UserRepository {
             .bind(username_or_email)
             .fetch_optional(self.db_pool.as_ref())
             .await
-            .map_err(|e| AppError::Database(e))?;
+            .map_err(AppError::Database)?;
 
         Ok(user)
     }
@@ -97,7 +97,7 @@ impl UserRepository {
             .bind(username)
             .fetch_one(self.db_pool.as_ref())
             .await
-            .map_err(|e| AppError::Database(e))?;
+            .map_err(AppError::Database)?;
 
         Ok(exists)
     }
@@ -109,7 +109,7 @@ impl UserRepository {
             .bind(email)
             .fetch_one(self.db_pool.as_ref())
             .await
-            .map_err(|e| AppError::Database(e))?;
+            .map_err(AppError::Database)?;
 
         Ok(exists)
     }
@@ -124,7 +124,7 @@ impl UserRepository {
             .bind(offset)
             .fetch_all(self.db_pool.as_ref())
             .await
-            .map_err(|e| AppError::Database(e))?;
+            .map_err(AppError::Database)?;
 
         Ok(users)
     }
@@ -136,7 +136,7 @@ impl UserRepository {
             .bind(id)
             .execute(self.db_pool.as_ref())
             .await
-            .map_err(|e| AppError::Database(e))?;
+            .map_err(AppError::Database)?;
 
         self.find_by_id(id).await?.ok_or(AppError::NotFound("User not found".to_string()))
     }
@@ -147,7 +147,7 @@ impl UserRepository {
             .bind(id)
             .execute(self.db_pool.as_ref())
             .await
-            .map_err(|e| AppError::Database(e))?;
+            .map_err(AppError::Database)?;
 
         Ok(())
     }

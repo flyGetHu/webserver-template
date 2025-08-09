@@ -23,7 +23,7 @@ impl AuthService {
         // 验证请求数据
         request
             .validate()
-            .map_err(|e| AppError::Validation(format!("Validation failed: {}", e)))?;
+            .map_err(|e| AppError::Validation(format!("Validation failed: {e}")))?;
 
         // TODO: 实际的注册逻辑
         // 1. 检查用户名和邮箱是否已存在
@@ -48,7 +48,7 @@ impl AuthService {
         // 验证请求数据
         request
             .validate()
-            .map_err(|e| AppError::Validation(format!("Validation failed: {}", e)))?;
+            .map_err(|e| AppError::Validation(format!("Validation failed: {e}")))?;
 
         // TODO: 实际的登录逻辑
         // 1. 根据用户名或邮箱查找用户

@@ -5,5 +5,3 @@
 pub mod cors;
 pub mod jwt;
 
-pub use cors::cors_hoop;
-pub use jwt::{jwt_auth_hoop, JwtClaims};

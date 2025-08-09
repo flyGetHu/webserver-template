@@ -54,7 +54,7 @@ impl Config {
             // 1. 默认配置文件
             .merge(Toml::file("config/default.toml"))
             // 2. 环境特定配置文件 (可选)
-            .merge(Toml::file(format!("config/{}.toml", run_mode)).nested())
+            .merge(Toml::file(format!("config/{run_mode}.toml")).nested())
             // 3. 环境变量覆盖 (最高优先级)
             .merge(Env::prefixed("APP_").global());
 

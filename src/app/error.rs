@@ -177,7 +177,7 @@ impl AppError {
                 )
             }
             AppError::ValidationErrors(errors) => {
-                let msg = format!("Validation failed: {}", errors);
+                let msg = format!("Validation failed: {errors}");
                 error!("Validation errors: {}", msg);
                 (
                     StatusCode::BAD_REQUEST,

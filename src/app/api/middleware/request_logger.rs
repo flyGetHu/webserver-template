@@ -116,7 +116,6 @@ pub async fn detailed_request_logger(
 
     // 获取基本请求信息
     let method = req.method().to_string();
-    let uri = req.uri().to_string();
     let path = req.uri().path().to_string();
     let query = req.uri().query().unwrap_or("").to_string();
 
@@ -126,7 +125,7 @@ pub async fn detailed_request_logger(
         if let Ok(value_str) = value.to_str() {
             // 过滤敏感头信息
             if !is_sensitive_header(name.as_str()) {
-                headers.push(format!("{}={}", name, value_str));
+                headers.push(format!("{name}={value_str}"));
             }
         }
     }

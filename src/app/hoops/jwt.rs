@@ -84,7 +84,7 @@ pub fn generate_token(config: &Config, user_id: i32, username: String, email: St
         &claims,
         &EncodingKey::from_secret(config.jwt.secret.as_bytes()),
     )
-    .map_err(|e| AppError::Internal(format!("Failed to generate JWT token: {}", e)))?;
+    .map_err(|e| AppError::Internal(format!("Failed to generate JWT token: {e}")))?;
     
     Ok(token)
 }
@@ -100,7 +100,7 @@ pub fn verify_token(config: &Config, token: &str) -> Result<JwtClaims, AppError>
         &DecodingKey::from_secret(config.jwt.secret.as_bytes()),
         &validation,
     )
-    .map_err(|e| AppError::Business(format!("Invalid JWT token: {}", e)))?;
+    .map_err(|e| AppError::Business(format!("Invalid JWT token: {e}")))?;
     
     let claims = token_data.claims;
     
