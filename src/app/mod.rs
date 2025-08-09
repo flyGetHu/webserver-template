@@ -5,6 +5,7 @@ pub mod config;
 pub mod container;
 pub mod domain;
 pub mod error;
+pub mod hoops;
 pub mod infrastructure;
 pub mod modules;
 pub mod state;
@@ -22,7 +23,7 @@ use crate::app::{
         routes::create_routes,
     },
     config::Config,
-    container::{inject_services, AppServices},
+    container::{inject_services_middleware, AppServices},
     state::AppState,
 };
 
@@ -32,7 +33,7 @@ use crate::app::{
 pub async fn run() -> anyhow::Result<()> {
     // 加载配置
     let config = Config::load().expect("Failed to load configuration");
-    
+
     // 使用新的日志配置初始化日志系统
     let _log_guard = config.log.guard();
     tracing::info!("Loaded configuration: {:?}", config);
@@ -62,10 +63,11 @@ pub async fn run() -> anyhow::Result<()> {
     let app_state = Arc::new(app_state);
 
     // 创建应用服务容器
-    let _services = Arc::new(AppServices::new(Arc::new(config.clone()), app_state.clone()).await);
+    let services = Arc::new(AppServices::new(Arc::new(config.clone()), app_state.clone()).await);
 
     // 绑定地址 - 使用新的 listen_addr 配置
-    let addr: std::net::SocketAddr = config.listen_addr
+    let addr: std::net::SocketAddr = config
+        .listen_addr
         .parse()
         .expect("Failed to parse server address");
 
@@ -75,7 +77,7 @@ pub async fn run() -> anyhow::Result<()> {
     let router = create_routes()
         .hoop(create_request_id_middleware()) // Salvo 内置 RequestId 中间件
         .hoop(request_id_handler) // 自定义处理器，集成 tracing 和 depot
-        .hoop(inject_services) // 服务注入中间件
+        .hoop(inject_services_middleware(services)) // 新的服务注入中间件
         .hoop(request_logger) // 请求日志中间件
         .hoop(global_exception_handler); // 全局异常处理
 

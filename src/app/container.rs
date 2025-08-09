@@ -53,9 +53,44 @@ impl AppServices {
     }
 }
 
-/// Salvo 中间件：服务注入器
+/// 创建服务注入中间件
 ///
-/// 简化版本 - 暂时跳过服务注入，直接继续处理
+/// 返回一个中间件 Handler，将 AppServices 注入到 Depot 中
+pub fn inject_services_middleware(services: Arc<AppServices>) -> ServiceInjectionHandler {
+    ServiceInjectionHandler { services }
+}
+
+/// 服务注入中间件 Handler
+#[derive(Clone)]
+pub struct ServiceInjectionHandler {
+    services: Arc<AppServices>,
+}
+
+#[async_trait::async_trait]
+impl Handler for ServiceInjectionHandler {
+    async fn handle(
+        &self,
+        req: &mut Request,
+        depot: &mut Depot,
+        res: &mut Response,
+        ctrl: &mut FlowCtrl,
+    ) {
+        // 将各个服务注入到 Depot 中
+        depot.insert("app_services", self.services.clone());
+        depot.insert("config", self.services.config.clone());
+        depot.insert("app_state", self.services.app_state.clone());
+        depot.insert("user_repository", self.services.user_repository.clone());
+        depot.insert("auth_service", self.services.auth_service.clone());
+        depot.insert("user_service", self.services.user_service.clone());
+
+        // 继续处理请求
+        ctrl.call_next(req, depot, res).await;
+    }
+}
+
+/// 便捷的服务注入中间件 Handler
+///
+/// 简化版本的服务注入器，用于直接在路由中使用
 #[handler]
 pub async fn inject_services(
     req: &mut Request,
@@ -63,7 +98,8 @@ pub async fn inject_services(
     res: &mut Response,
     ctrl: &mut FlowCtrl,
 ) {
-    // 暂时简化实现，后续可以添加实际的服务注入逻辑
+    // 这个函数现在主要用于测试或特殊场景
+    // 实际使用中推荐使用 inject_services_middleware 函数
     ctrl.call_next(req, depot, res).await;
 }
 
@@ -87,14 +123,25 @@ macro_rules! get_service {
 
 /// 服务获取的便捷扩展 trait
 pub trait DepotServiceExt {
+    /// 获取完整的应用服务容器
+    fn get_app_services(&self) -> Result<Arc<AppServices>, crate::app::error::AppError>;
+    /// 获取用户仓库服务
     fn get_user_repository(&self) -> Result<Arc<UserRepository>, crate::app::error::AppError>;
+    /// 获取认证服务
     fn get_auth_service(&self) -> Result<Arc<AuthService>, crate::app::error::AppError>;
+    /// 获取用户服务
     fn get_user_service(&self) -> Result<Arc<UserService>, crate::app::error::AppError>;
+    /// 获取配置
     fn get_config(&self) -> Result<Arc<Config>, crate::app::error::AppError>;
+    /// 获取应用状态
     fn get_app_state(&self) -> Result<Arc<AppState>, crate::app::error::AppError>;
 }
 
 impl DepotServiceExt for Depot {
+    fn get_app_services(&self) -> Result<Arc<AppServices>, crate::app::error::AppError> {
+        get_service!(self, AppServices, "app_services")
+    }
+
     fn get_user_repository(&self) -> Result<Arc<UserRepository>, crate::app::error::AppError> {
         get_service!(self, UserRepository, "user_repository")
     }
@@ -146,14 +193,48 @@ mod tests {
         let services = Arc::new(AppServices::new(config, app_state).await);
 
         let mut depot = Depot::new();
+        // 模拟服务注入中间件的行为
+        depot.insert("app_services", services.clone());
         depot.insert("user_repository", services.user_repository.clone());
         depot.insert("auth_service", services.auth_service.clone());
+        depot.insert("user_service", services.user_service.clone());
+        depot.insert("config", services.config.clone());
+        depot.insert("app_state", services.app_state.clone());
 
         // 测试服务获取
+        let app_services = depot.get_app_services();
+        assert!(app_services.is_ok());
+
         let user_repo = depot.get_user_repository();
         assert!(user_repo.is_ok());
 
         let auth_service = depot.get_auth_service();
         assert!(auth_service.is_ok());
+
+        let user_service = depot.get_user_service();
+        assert!(user_service.is_ok());
+
+        let config = depot.get_config();
+        assert!(config.is_ok());
+
+        let app_state = depot.get_app_state();
+        assert!(app_state.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_service_injection_middleware() {
+        let config = Arc::new(crate::app::config::Config::load().unwrap());
+        let db_pool = create_mock_db_pool().await.unwrap();
+        let redis_pool = create_mock_redis_pool().await.unwrap();
+        let app_state = Arc::new(AppState::new(db_pool, redis_pool));
+
+        let services = Arc::new(AppServices::new(config, app_state).await);
+
+        // 测试中间件创建
+        let _middleware = inject_services_middleware(services.clone());
+
+        // 验证中间件可以正常创建
+        // 注意：这里只是验证中间件函数可以创建，实际的注入测试需要在集成测试中进行
+        assert!(true); // 如果能到这里说明中间件创建成功
     }
 }

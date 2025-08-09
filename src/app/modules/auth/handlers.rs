@@ -5,7 +5,10 @@
 use salvo::prelude::*;
 use uuid::Uuid;
 
-use crate::app::{api::response::ApiResponse, error::AppError, modules::auth::models::*};
+use crate::app::{
+    api::response::ApiResponse, container::DepotServiceExt, error::AppError,
+    modules::auth::models::*,
+};
 
 /// 用户注册处理器
 #[endpoint(
@@ -22,23 +25,34 @@ pub async fn register(
     depot: &mut Depot,
     res: &mut Response,
 ) -> Result<(), AppError> {
+    // 获取 request_id
     let request_id = depot
         .get::<Uuid>("request_id")
         .cloned()
         .unwrap_or_else(|_| Uuid::new_v4());
 
+    // 解析请求数据
     let payload = req
         .parse_json::<RegisterRequest>()
         .await
         .map_err(|e| AppError::Validation(e.to_string()))?;
 
-    // 临时实现 - 直接返回模拟响应
+    // 使用新的依赖注入系统获取认证服务
+    let auth_service = depot.get_auth_service()?;
+
+    // 调用认证服务进行用户注册
+    let user = auth_service.register_user(payload.into()).await?;
+
+    // 生成 JWT token
+    let token = auth_service.generate_jwt(&user)?;
+
+    // 构建响应
     let response = AuthResponse {
-        token: "fake_jwt_token".to_string(),
-        user_id: 1,
-        username: payload.username,
-        email: payload.email,
-        roles: vec!["user".to_string()],
+        token,
+        user_id: user.id,
+        username: user.username,
+        email: user.email,
+        roles: vec!["user".to_string()], // TODO: 从用户角色表获取
     };
 
     res.render(Json(ApiResponse::new(response, request_id)));
