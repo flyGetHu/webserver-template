@@ -104,7 +104,7 @@ impl AuthService {
     /// 生成JWT令牌
     pub fn generate_jwt(&self, user: &User) -> Result<String, AppError> {
         let expiration = Utc::now()
-            + Duration::hours(self.config.jwt.expiration_hours);
+            + Duration::seconds(self.config.jwt.expiry);
 
         let claims = Claims {
             user_id: user.id,
