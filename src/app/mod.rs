@@ -9,7 +9,6 @@ pub mod infrastructure;
 pub mod modules;
 pub mod state;
 use salvo::prelude::*;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use std::sync::Arc;
 
@@ -21,7 +20,6 @@ use crate::app::{
             request_logger::request_logger,
         },
         routes::create_routes,
-        telemetry::RequestIdFormat,
     },
     config::Config,
     container::{inject_services, AppServices},
@@ -32,17 +30,11 @@ use crate::app::{
 ///
 /// 该函数封装了应用启动的完整逻辑
 pub async fn run() -> anyhow::Result<()> {
-    // 初始化日志
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::new(
-            std::env::var("RUST_LOG")
-                .unwrap_or_else(|_| "webserver_template=debug,salvo=debug".into()),
-        ))
-        .with(tracing_subscriber::fmt::layer().event_format(RequestIdFormat))
-        .init();
-
     // 加载配置
     let config = Config::load().expect("Failed to load configuration");
+    
+    // 使用新的日志配置初始化日志系统
+    let _log_guard = config.log.guard();
     tracing::info!("Loaded configuration: {:?}", config);
 
     // 创建数据库连接池
@@ -70,10 +62,10 @@ pub async fn run() -> anyhow::Result<()> {
     let app_state = Arc::new(app_state);
 
     // 创建应用服务容器
-    let services = Arc::new(AppServices::new(Arc::new(config.clone()), app_state.clone()).await);
+    let _services = Arc::new(AppServices::new(Arc::new(config.clone()), app_state.clone()).await);
 
-    // 绑定地址
-    let addr: std::net::SocketAddr = format!("{}:{}", config.server.host, config.server.port)
+    // 绑定地址 - 使用新的 listen_addr 配置
+    let addr: std::net::SocketAddr = config.listen_addr
         .parse()
         .expect("Failed to parse server address");
 
