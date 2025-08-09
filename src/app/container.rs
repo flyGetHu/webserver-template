@@ -131,9 +131,9 @@ mod tests {
         let services = AppServices::new(config, app_state).await;
 
         // 验证所有服务都已正确创建
-        assert!(!services.user_repository.as_ref() as *const _ as usize == 0);
-        assert!(!services.auth_service.as_ref() as *const _ as usize == 0);
-        assert!(!services.user_service.as_ref() as *const _ as usize == 0);
+        assert!(services.user_repository.as_ref() as *const _ as usize != 0);
+        assert!(services.auth_service.as_ref() as *const _ as usize != 0);
+        assert!(services.user_service.as_ref() as *const _ as usize != 0);
     }
 
     #[tokio::test]
