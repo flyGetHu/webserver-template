@@ -18,6 +18,8 @@ impl<T> ValidatedJson<T>
 where
     T: DeserializeOwned + Validate,
 {
+    /// # Errors
+    /// 解析或校验失败返回 `AppError`
     pub async fn extract(req: &mut Request) -> Result<Self, AppError> {
         let value = req.parse_json::<T>().await
             .map_err(|e| AppError::Validation(e.to_string()))?;
@@ -34,7 +36,9 @@ where
 ///
 /// 从请求扩展中提取当前认证用户的Claims
 impl CurrentUser {
-    pub async fn extract(depot: &mut Depot) -> Result<Self, AppError> {
+    /// # Errors
+    /// 未认证或上下文缺失时返回 `AppError`
+    pub fn extract(depot: &mut Depot) -> Result<Self, AppError> {
         if let Ok(current_user) = depot.get::<CurrentUser>("current_user") {
             Ok(current_user.clone())
         } else {

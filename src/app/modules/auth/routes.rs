@@ -12,6 +12,7 @@ use super::handlers::{login, logout, register};
 /// - POST /auth/register - 用户注册
 /// - POST /auth/login - 用户登录  
 /// - POST /auth/logout - 用户注销
+#[must_use]
 pub fn create_routes() -> Router {
     Router::with_path("auth")
         .push(Router::with_path("register").post(register))

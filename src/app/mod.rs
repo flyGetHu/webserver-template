@@ -30,6 +30,12 @@ use crate::app::{
 /// 运行应用的主要函数
 ///
 /// 该函数封装了应用启动的完整逻辑
+///
+/// # Panics
+/// 当配置加载失败时会 panic（内部使用 `expect`）。
+///
+/// # Errors
+/// 网络绑定或服务运行失败时返回错误。
 pub async fn run() -> anyhow::Result<()> {
     // 加载配置
     let config = Config::load().expect("Failed to load configuration");
@@ -38,13 +44,13 @@ pub async fn run() -> anyhow::Result<()> {
     let _log_guard = config.log.guard();
     tracing::info!("Loaded configuration: {:?}", config);
 
-    // 创建数据库连接池
-    let db_pool = match state::create_db_pool(&config.database.url).await {
-        Ok(pool) => pool,
+    // 创建数据库连接
+    let rb = match state::create_db_pool(&config.database.url) {
+        Ok(rb) => rb,
         Err(e) => {
             tracing::warn!("Failed to create database pool: {}", e);
-            // Create a mock pool for testing
-            state::create_mock_db_pool().await?
+            // Create a mock rb for testing
+            state::create_mock_db_pool()?
         }
     };
 
@@ -59,11 +65,11 @@ pub async fn run() -> anyhow::Result<()> {
     };
 
     // 创建应用状态
-    let app_state = AppState::new(db_pool, redis_pool);
+    let app_state = AppState::new(rb, redis_pool);
     let app_state = Arc::new(app_state);
 
     // 创建应用服务容器
-    let services = Arc::new(AppServices::new(Arc::new(config.clone()), app_state.clone()).await);
+    let services = Arc::new(AppServices::new(Arc::new(config.clone()), app_state.clone()));
 
     // 绑定地址 - 使用新的 listen_addr 配置
     let addr: std::net::SocketAddr = config

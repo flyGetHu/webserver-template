@@ -45,6 +45,8 @@ pub struct TlsConfig {
 }
 
 impl Config {
+    /// # Errors
+    /// 配置解析或读取失败时返回 `figment::Error`
     pub fn load() -> Result<Self, figment::Error> {
         // 获取运行模式
         let run_mode = std::env::var("RUN_MODE").unwrap_or_else(|_| "development".into());

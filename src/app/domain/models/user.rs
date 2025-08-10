@@ -1,10 +1,9 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
 use validator::Validate;
 
 /// 用户领域模型
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     /// 用户ID
     pub id: i32,
@@ -17,8 +16,7 @@ pub struct User {
     pub password_hash: String,
     /// 年龄
     pub age: Option<i32>,
-    /// 用户角色列表
-    #[sqlx(json)]
+    /// 用户角色列表（RBatis手动反序列化）
     pub roles: Vec<String>,
     /// 创建时间
     pub created_at: DateTime<Utc>,

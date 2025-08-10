@@ -11,6 +11,7 @@ const FORMAT_JSON: &str = "json";
 const FORMAT_FULL: &str = "full";
 
 #[derive(Deserialize, Clone, Debug)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct LogConfig {
     #[serde(default = "default_filter_level")]
     pub filter_level: String,
@@ -83,36 +84,41 @@ impl Default for LogConfig {
 
 #[allow(dead_code)]
 impl LogConfig {
-    /// Will try_from_default_env while not setted.
+    /// Will `try_from_default_env` while not setted.
     ///
     /// You can use value like "info", or something like "mycrate=trace".
     ///
     /// Default value if "info".
     ///
+    #[must_use]
     pub fn filter_level(mut self, filter_level: &str) -> Self {
-        self.filter_level = filter_level.to_owned();
+        filter_level.clone_into(&mut self.filter_level);
         self
     }
 
     /// Show ANSI color symbols.
+    #[must_use]
     pub fn with_ansi(mut self, with_ansi: bool) -> Self {
         self.with_ansi = with_ansi;
         self
     }
 
     /// Will append log to stdout.
+    #[must_use]
     pub fn stdout(mut self, stdout: bool) -> Self {
         self.stdout = stdout;
         self
     }
 
     /// Set log file directory.
+    #[must_use]
     pub fn directory(mut self, directory: impl Into<String>) -> Self {
         self.directory = directory.into();
         self
     }
 
     /// Set log file name.
+    #[must_use]
     pub fn file_name(mut self, file_name: impl Into<String>) -> Self {
         self.file_name = file_name.into();
         self
@@ -121,11 +127,16 @@ impl LogConfig {
     /// Valid values: minutely | hourly | daily | never
     ///
     /// Will panic on other values.
+    ///
+    /// # Panics
+    /// 当提供的 `rolling` 不在允许列表中时会 panic。
+    #[must_use]
     pub fn rolling(mut self, rolling: impl Into<String>) -> Self {
         let rolling = rolling.into();
-        if !["minutely", "hourly", "daily", "never"].contains(&&*rolling) {
-            panic!("Unknown rolling")
-        }
+        assert!(
+            ["minutely", "hourly", "daily", "never"].contains(&&*rolling),
+            "Unknown rolling"
+        );
         self.rolling = rolling;
         self
     }
@@ -133,6 +144,10 @@ impl LogConfig {
     /// Valid values: pretty | compact | json | full
     ///
     /// Will panic on other values.
+    ///
+    /// # Panics
+    /// 当提供的 `format` 不在允许列表中时会 panic。
+    #[must_use]
     pub fn format(mut self, format: impl Into<String>) -> Self {
         let format = format.into();
         if format != FORMAT_PRETTY
@@ -147,30 +162,35 @@ impl LogConfig {
     }
 
     /// include levels in formatted output
+    #[must_use]
     pub fn with_level(mut self, with_level: bool) -> Self {
         self.with_level = with_level;
         self
     }
 
     /// include targets
+    #[must_use]
     pub fn with_target(mut self, with_target: bool) -> Self {
         self.with_target = with_target;
         self
     }
 
     /// include the thread ID of the current thread
+    #[must_use]
     pub fn with_thread_ids(mut self, with_thread_ids: bool) -> Self {
         self.with_thread_ids = with_thread_ids;
         self
     }
 
     /// include the name of the current thread
+    #[must_use]
     pub fn with_thread_names(mut self, with_thread_names: bool) -> Self {
         self.with_thread_names = with_thread_names;
         self
     }
 
     /// include source location
+    #[must_use]
     pub fn with_source_location(mut self, with_source_location: bool) -> Self {
         self.with_source_location = with_source_location;
         self
@@ -185,7 +205,6 @@ impl LogConfig {
             "minutely" => rolling::minutely(&self.directory, &self.file_name),
             "hourly" => rolling::hourly(&self.directory, &self.file_name),
             "daily" => rolling::daily(&self.directory, &self.file_name),
-            "never" => rolling::never(&self.directory, &self.file_name),
             _ => rolling::never(&self.directory, &self.file_name),
         };
         let (file_writer, guard) = tracing_appender::non_blocking(file_appender);
@@ -212,7 +231,7 @@ impl LogConfig {
                 subscriber.with_writer(std::io::stdout).init();
             } else {
                 subscriber.with_writer(file_writer).init();
-            };
+            }
         } else if self.format == FORMAT_COMPACT {
             let subscriber = subscriber.event_format(
                 fmt::format()
@@ -227,7 +246,7 @@ impl LogConfig {
                 subscriber.with_writer(std::io::stdout).init();
             } else {
                 subscriber.with_writer(file_writer).init();
-            };
+            }
         } else if self.format == FORMAT_JSON {
             // JSON 格式使用标准格式，但可以通过环境变量 RUST_LOG_FORMAT=json 来启用
             let subscriber = subscriber.event_format(
@@ -242,7 +261,7 @@ impl LogConfig {
                 subscriber.with_writer(std::io::stdout).init();
             } else {
                 subscriber.with_writer(file_writer).init();
-            };
+            }
         } else if self.format == FORMAT_FULL {
             let subscriber = subscriber.event_format(
                 fmt::format()
@@ -256,7 +275,7 @@ impl LogConfig {
                 subscriber.with_writer(std::io::stdout).init();
             } else {
                 subscriber.with_writer(file_writer).init();
-            };
+            }
         }
 
         // Caller should hold this handler.

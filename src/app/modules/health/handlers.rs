@@ -19,6 +19,7 @@ pub async fn health_check(res: &mut Response) {
 }
 
 /// 创建健康检查路由
+#[must_use]
 pub fn create_routes() -> Router {
     Router::with_path("health").get(health_check)
 }

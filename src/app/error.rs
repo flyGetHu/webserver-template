@@ -33,9 +33,9 @@ pub enum AppError {
     #[error("validation errors: `{0}`")]
     ValidationErrors(#[from] validator::ValidationErrors),
 
-    /// 数据库错误 - 保留 SQLx 支持
+    /// 数据库错误 - `RBatis` 支持
     #[error("database error: `{0}`")]
-    Database(#[from] sqlx::Error),
+    Database(#[from] rbatis::Error),
 
     /// 未找到资源错误
     #[error("not found: `{0}`")]
@@ -71,6 +71,7 @@ pub enum AppError {
 }
 
 /// 统一的API响应格式（包括成功和错误）
+#[allow(clippy::too_many_lines)]
 #[derive(Serialize)]
 pub struct ApiError {
     /// 响应代码，200表示成功，非200表示各种错误
@@ -120,24 +121,29 @@ impl AppError {
     }
 
     /// 创建特定HTTP状态码的错误 (保持向后兼容)
+    #[must_use]
     pub fn unauthorized(message: String) -> Self {
         AppError::Authentication(message)
     }
 
+    #[must_use]
     pub fn forbidden(message: String) -> Self {
         AppError::Authorization(message)
     }
 
+    #[must_use]
     pub fn too_many_requests(message: String) -> Self {
         AppError::Business(message)
     }
 
+    #[must_use]
     pub fn method_not_allowed(message: String) -> Self {
         AppError::Business(message)
     }
 
     /// 转换为 API 错误响应 (保留 webserver-template 的响应格式)
-    pub fn to_api_error(&self, request_id: Uuid) -> (StatusCode, ApiError) {
+#[allow(clippy::too_many_lines)]
+pub fn to_api_error(&self, request_id: Uuid) -> (StatusCode, ApiError) {
         let request_id = request_id.to_string();
         match self {
             AppError::Public(msg) => {
@@ -266,7 +272,7 @@ impl AppError {
                 (
                     status_error.code,
                     ApiError {
-                        code: status_error.code.as_u16() as i32,
+                        code: i32::from(status_error.code.as_u16()),
                         message: if status_error.brief.is_empty() {
                             "HTTP error".to_string()
                         } else {
@@ -307,7 +313,7 @@ impl AppError {
 
 /// Scribe trait 实现 (融合两个项目的优势)
 ///
-/// 保留 webserver-template 的响应格式，集成 request_id 追踪
+/// 保留 webserver-template 的响应格式，集成 `request_id` 追踪
 impl Scribe for AppError {
     fn render(self, res: &mut Response) {
         // 生成一个随机的request_id
@@ -319,7 +325,7 @@ impl Scribe for AppError {
     }
 }
 
-/// OpenAPI 文档注册 (基于 salvo-template 的实现)
+/// `OpenAPI` 文档注册 (基于 salvo-template 的实现)
 impl EndpointOutRegister for AppError {
     fn register(components: &mut salvo::oapi::Components, operation: &mut salvo::oapi::Operation) {
         operation.responses.insert(

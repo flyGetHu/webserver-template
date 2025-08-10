@@ -5,7 +5,11 @@
 use salvo::prelude::*;
 use uuid::Uuid;
 
-use crate::app::{api::response::ApiResponse, error::AppError, modules::users::models::*};
+use crate::app::{
+    api::response::ApiResponse,
+    error::AppError,
+    modules::users::models::{CreateUserRequest, UpdateUserRequest, UserListResponse, UserResponse},
+};
 
 /// 获取用户列表处理器
 #[endpoint(

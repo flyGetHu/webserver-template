@@ -14,23 +14,23 @@ use uuid::Uuid;
 /// - Request ID
 #[handler]
 pub async fn request_logger(
-    req: &mut Request,
+    request: &mut Request,
     depot: &mut Depot,
-    res: &mut Response,
+    response: &mut Response,
     ctrl: &mut FlowCtrl,
 ) {
     let start_time = Instant::now();
 
     // 获取请求信息
-    let method = req.method().to_string();
-    let uri = req.uri().to_string();
-    let version = format!("{:?}", req.version());
+    let method = request.method().to_string();
+    let uri = request.uri().to_string();
+    let version = format!("{:?}", request.version());
 
     // 获取客户端IP
-    let client_ip = req.remote_addr().to_string();
+    let client_ip = request.remote_addr().to_string();
 
     // 获取 User-Agent
-    let user_agent = req
+    let user_agent = request
         .header::<String>("user-agent")
         .unwrap_or_else(|| "unknown".to_string());
 
@@ -52,17 +52,17 @@ pub async fn request_logger(
     );
 
     // 处理请求
-    ctrl.call_next(req, depot, res).await;
+    ctrl.call_next(request, depot, response).await;
 
     // 计算处理时间
     let duration = start_time.elapsed();
     let duration_ms = duration.as_millis();
 
     // 获取响应状态码
-    let status_code = res.status_code.unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+    let status_code = response.status_code.unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
 
     // 获取响应内容长度
-    let content_length = res
+    let content_length = response
         .headers()
         .get("content-length")
         .and_then(|v| v.to_str().ok())
@@ -121,7 +121,7 @@ pub async fn detailed_request_logger(
 
     // 获取请求头信息
     let mut headers = Vec::new();
-    for (name, value) in req.headers().iter() {
+    for (name, value) in req.headers() {
         if let Ok(value_str) = value.to_str() {
             // 过滤敏感头信息
             if !is_sensitive_header(name.as_str()) {

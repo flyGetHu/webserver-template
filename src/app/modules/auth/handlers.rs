@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::app::{
     api::response::ApiResponse, container::DepotServiceExt, error::AppError,
-    modules::auth::models::*,
+    modules::auth::models::{AuthResponse, LoginRequest, RegisterRequest},
 };
 
 /// 用户注册处理器

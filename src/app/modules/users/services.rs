@@ -4,19 +4,25 @@
 
 use validator::Validate;
 
-use crate::app::{error::AppError, modules::users::models::*};
+use crate::app::{
+    error::AppError,
+    modules::users::models::{CreateUserRequest, UpdateUserRequest, UserListResponse, UserResponse},
+};
 
 /// 用户服务
 pub struct UserService;
 
 impl UserService {
     /// 创建新的用户服务实例
+    #[must_use]
     pub fn new() -> Self {
         Self
     }
 
     /// 获取用户列表
-    pub async fn list_users(
+    /// # Errors
+    /// 验证失败时返回 `AppError::Validation`
+    pub fn list_users(
         &self,
         page: i32,
         page_size: i32,
@@ -55,7 +61,9 @@ impl UserService {
     }
 
     /// 根据ID获取用户
-    pub async fn get_user(&self, id: i32) -> Result<UserResponse, AppError> {
+    /// # Errors
+    /// 当 `id` 非法时返回 `NotFound`
+    pub fn get_user(&self, id: i32) -> Result<UserResponse, AppError> {
         // TODO: 实际的查询逻辑
         // 1. 从数据库根据ID查询用户
         // 2. 如果不存在返回错误
@@ -76,7 +84,9 @@ impl UserService {
     }
 
     /// 创建用户
-    pub async fn create_user(&self, request: CreateUserRequest) -> Result<UserResponse, AppError> {
+    /// # Errors
+    /// 验证失败时返回 `AppError::Validation`
+    pub fn create_user(&self, request: CreateUserRequest) -> Result<UserResponse, AppError> {
         // 验证请求数据
         request
             .validate()
@@ -99,7 +109,9 @@ impl UserService {
     }
 
     /// 更新用户
-    pub async fn update_user(
+    /// # Errors
+    /// 验证失败或用户不存在时返回错误
+    pub fn update_user(
         &self,
         id: i32,
         request: UpdateUserRequest,
@@ -132,7 +144,9 @@ impl UserService {
     }
 
     /// 删除用户
-    pub async fn delete_user(&self, id: i32) -> Result<(), AppError> {
+    /// # Errors
+    /// 用户不存在时返回错误
+    pub fn delete_user(&self, id: i32) -> Result<(), AppError> {
         // TODO: 实际的删除逻辑
         // 1. 检查用户是否存在
         // 2. 删除用户

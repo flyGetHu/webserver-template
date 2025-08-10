@@ -8,6 +8,7 @@ use salvo::http::{HeaderName, HeaderValue, Method};
 /// 创建 CORS 中间件
 ///
 /// 基于 salvo-template 的实现，提供标准的跨域资源共享支持
+#[must_use]
 pub fn cors_hoop() -> CorsHandler {
     Cors::new()
         .allow_origin(AllowOrigin::any())
@@ -19,10 +20,13 @@ pub fn cors_hoop() -> CorsHandler {
 /// 创建生产环境的 CORS 中间件
 ///
 /// 更严格的 CORS 配置，适用于生产环境
+/// # Panics
+/// 当 `allowed_origins` 中存在非法 header 值时会触发
+#[must_use]
 pub fn cors_hoop_production(allowed_origins: Vec<&str>) -> CorsHandler {
     let origins: Vec<HeaderValue> = allowed_origins
         .into_iter()
-        .map(|origin| HeaderValue::from_str(origin).unwrap())
+        .map(|origin| HeaderValue::from_str(origin).expect("invalid origin header"))
         .collect();
 
     let methods = vec![

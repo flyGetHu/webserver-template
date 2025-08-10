@@ -6,6 +6,7 @@ use salvo::prelude::*;
 
 
 /// 创建Swagger UI路由
+#[must_use]
 pub fn create_swagger_routes() -> Router {
     // 创建OpenAPI文档
     let doc = OpenApi::new("Web服务器模板API", "1.0.0");

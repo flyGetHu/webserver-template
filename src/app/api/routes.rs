@@ -11,7 +11,8 @@ use crate::app::{api::docs, hoops, modules};
 /// 融合两个项目的路由组织优势：
 /// - 保留 webserver-template 的模块化结构
 /// - 引入 salvo-template 的标准中间件应用方式
-/// - 优化 OpenAPI 文档集成
+/// - 优化 `OpenAPI` 文档集成
+#[must_use]
 pub fn create_routes() -> Router {
     // 创建 API 路由
     let api_router = Router::with_path("api/v1")

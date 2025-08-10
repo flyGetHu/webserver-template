@@ -14,6 +14,7 @@ use super::handlers::{create_user, delete_user, get_user, list_users, update_use
 /// - GET /users/{id} - 根据ID获取用户
 /// - PATCH /users/{id} - 更新用户
 /// - DELETE /users/{id} - 删除用户
+#[must_use]
 pub fn create_routes() -> Router {
     Router::with_path("users")
         // TODO: 添加认证中间件到需要认证的端点

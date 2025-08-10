@@ -26,21 +26,25 @@ pub struct CurrentUser(pub Claims);
 
 impl CurrentUser {
     /// 获取用户ID
+    #[must_use]
     pub fn user_id(&self) -> i32 {
         self.0.user_id
     }
 
     /// 获取用户名
+    #[must_use]
     pub fn username(&self) -> &str {
         &self.0.username
     }
 
     /// 获取用户邮箱
+    #[must_use]
     pub fn email(&self) -> &str {
         &self.0.email
     }
 
     /// 检查用户是否有指定角色
+    #[must_use]
     pub fn has_role(&self, role: &str) -> bool {
         self.0.roles.contains(&role.to_string())
     }

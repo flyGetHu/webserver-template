@@ -14,12 +14,15 @@ pub struct AuthService;
 
 impl AuthService {
     /// 创建新的认证服务实例
+    #[must_use]
     pub fn new() -> Self {
         Self
     }
 
     /// 用户注册
-    pub async fn register(&self, request: RegisterRequest) -> Result<AuthResponse, AppError> {
+    /// # Errors
+    /// 验证失败时返回 `AppError::Validation`
+    pub fn register(&self, request: RegisterRequest) -> Result<AuthResponse, AppError> {
         // 验证请求数据
         request
             .validate()
@@ -44,7 +47,9 @@ impl AuthService {
     }
 
     /// 用户登录
-    pub async fn login(&self, request: LoginRequest) -> Result<AuthResponse, AppError> {
+    /// # Errors
+    /// 验证失败时返回 `AppError::Validation`
+    pub fn login(&self, request: LoginRequest) -> Result<AuthResponse, AppError> {
         // 验证请求数据
         request
             .validate()
@@ -68,7 +73,9 @@ impl AuthService {
     }
 
     /// 用户注销
-    pub async fn logout(&self, _token: &str) -> Result<(), AppError> {
+    /// # Errors
+    /// 当前为无状态退出，不返回错误
+    pub fn logout(&self, _token: &str) -> Result<(), AppError> {
         // TODO: 实际的注销逻辑
         // 1. 将token加入黑名单
         // 2. 清理相关会话信息

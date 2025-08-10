@@ -3,9 +3,13 @@ name = "webserver-template"
 version = "0.1.0"
 edition = "2021"
 
+# cargo clippy -- -D clippy::unwrap_used -D clippy::pedantic
+[lints.clippy]
+unwrap_used = "deny"
+
 [dependencies]
 tokio = { version = "1.47.1", features = ["full"] }
-salvo = { version = "0.72", features = [
+salvo = { version = "0.81.0", features = [
   "cors",
   "oapi",
   "compression",
@@ -22,14 +26,12 @@ dotenvy = "0.15.7"
 anyhow = "1.0.98"
 async-trait = "0.1.88"
 # config = "0.15.13"  # 被 Figment 替代
-figment = { version = "0.10.8", features = ["env", "toml"] }
-sqlx = { version = "0.8.6", features = [
-  "runtime-tokio-rustls",
-  "mysql",
-  "uuid",
-  "time",
-  "chrono",
-] }
+figment = { version = "0.10.19", features = ["env", "toml"] }
+# RBatis ORM stack
+rbatis = { version = "4.6.8" }
+rbdc = { version = "4.6.0" }
+rbdc-mysql = { version = "4.6.0" }
+rbs = { version = "4.6.2" }
 # tower replaced by salvo's built-in features
 validator = { version = "0.20.0", features = ["derive"] }
 thiserror = "2.0.12"
@@ -39,15 +41,15 @@ bb8 = "0.9.0"
 bb8-redis = "0.24.0"
 jsonwebtoken = "9.3.1"
 chrono = { version = "0.4.41", features = ["serde"] }
-time = "0.3.37"
+time = "0.3.41"
 
 # API Documentation dependencies (built into Salvo)
 # utoipa replaced by salvo's built-in OpenAPI support
 argon2 = "0.5.3"
 
 [dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
-futures = "0.3"
+criterion = { version = "0.7.0", features = ["html_reports", "async_tokio"] }
+futures = "0.3.31"
 
 [[bench]]
 name = "performance_tests"

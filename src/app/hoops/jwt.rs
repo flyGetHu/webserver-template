@@ -32,6 +32,7 @@ pub struct JwtClaims {
 
 impl JwtClaims {
     /// 创建新的 JWT 声明
+    #[must_use]
     pub fn new(user_id: i32, username: String, email: String, roles: Vec<String>, expiry_seconds: i64) -> Self {
         let now = OffsetDateTime::now_utc();
         let exp = now + Duration::seconds(expiry_seconds);
@@ -47,11 +48,13 @@ impl JwtClaims {
     }
 
     /// 检查用户是否有指定角色
+    #[must_use]
     pub fn has_role(&self, role: &str) -> bool {
         self.roles.contains(&role.to_string())
     }
 
     /// 检查令牌是否已过期
+    #[must_use]
     pub fn is_expired(&self) -> bool {
         let now = OffsetDateTime::now_utc().unix_timestamp();
         now > self.exp
@@ -61,6 +64,7 @@ impl JwtClaims {
 /// 创建 JWT 认证中间件 (Salvo 标准方式)
 /// 
 /// 基于 salvo-template 的实现，支持多种令牌获取方式
+#[must_use]
 pub fn jwt_auth_hoop(config: &Config) -> JwtAuth<JwtClaims, ConstDecoder> {
     JwtAuth::new(ConstDecoder::from_secret(
         config.jwt.secret.as_bytes(),
@@ -76,6 +80,8 @@ pub fn jwt_auth_hoop(config: &Config) -> JwtAuth<JwtClaims, ConstDecoder> {
 /// 生成 JWT 令牌
 /// 
 /// 融合两个项目的令牌生成逻辑
+/// # Errors
+/// 生成 token 失败
 pub fn generate_token(config: &Config, user_id: i32, username: String, email: String, roles: Vec<String>) -> Result<String, AppError> {
     let claims = JwtClaims::new(user_id, username, email, roles, config.jwt.expiry);
     
@@ -92,6 +98,8 @@ pub fn generate_token(config: &Config, user_id: i32, username: String, email: St
 /// 验证 JWT 令牌
 /// 
 /// 提供手动验证令牌的功能
+/// # Errors
+/// token 无效或过期
 pub fn verify_token(config: &Config, token: &str) -> Result<JwtClaims, AppError> {
     let validation = Validation::new(Algorithm::HS256);
     
@@ -118,26 +126,31 @@ pub struct CurrentUser(pub JwtClaims);
 
 impl CurrentUser {
     /// 获取用户ID
+    #[must_use]
     pub fn user_id(&self) -> i32 {
         self.0.user_id
     }
 
     /// 获取用户名
+    #[must_use]
     pub fn username(&self) -> &str {
         &self.0.username
     }
 
     /// 获取用户邮箱
+    #[must_use]
     pub fn email(&self) -> &str {
         &self.0.email
     }
 
     /// 获取用户角色
+    #[must_use]
     pub fn roles(&self) -> &[String] {
         &self.0.roles
     }
 
     /// 检查用户是否有指定角色
+    #[must_use]
     pub fn has_role(&self, role: &str) -> bool {
         self.0.has_role(role)
     }
@@ -146,6 +159,8 @@ impl CurrentUser {
 /// 从 Depot 中获取当前用户
 /// 
 /// 便捷函数，用于在处理器中获取当前认证用户
+/// # Errors
+/// 用户未认证时返回错误
 pub fn get_current_user(depot: &Depot) -> Result<CurrentUser, AppError> {
     depot
         .get::<JwtClaims>("jwt_claims")

@@ -49,7 +49,7 @@ pub struct AuthResponse {
     pub roles: Vec<String>,
 }
 
-/// 从 RegisterRequest 转换为 CreateUserDto
+/// 从 `RegisterRequest` 转换为 `CreateUserDto`
 impl From<RegisterRequest> for CreateUserDto {
     fn from(request: RegisterRequest) -> Self {
         Self {

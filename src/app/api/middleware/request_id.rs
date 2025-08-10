@@ -4,10 +4,11 @@ use tracing::info_span;
 use tracing::Instrument;
 use uuid::Uuid;
 
-/// 创建配置好的 RequestId 中间件
+/// 创建配置好的 `RequestId` 中间件
 ///
-/// 根据 Salvo 官方文档，使用内置的 RequestId 中间件
-/// 参考: https://salvo.rs/zh-hans/guide/features/request-id.html
+/// 根据 Salvo 官方文档，使用内置的 `RequestId` 中间件
+/// 参考: <https://salvo.rs/zh-hans/guide/features/request-id.html>
+#[must_use]
 pub fn create_request_id_middleware() -> RequestId {
     RequestId::new().header_name(HeaderName::from_static("x-request-id")) // 设置响应头名称
 }
