@@ -3,7 +3,7 @@
 use salvo::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::app::error::AppError;
+use crate::app::{depot_keys::KEY_CURRENT_USER, error::AppError};
 
 /// JWT令牌中的声明
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -76,7 +76,7 @@ pub async fn jwt_auth(req: &mut Request, depot: &mut Depot, res: &mut Response, 
     let claims = crate::app::domain::services::AuthService::verify_jwt(token)?;
 
     // 将claims添加到depot中
-    depot.insert("current_user", CurrentUser(claims));
+    depot.insert(KEY_CURRENT_USER, CurrentUser(claims));
 
     // 继续处理请求
     ctrl.call_next(req, depot, res).await;
@@ -94,7 +94,7 @@ pub async fn optional_jwt_auth(req: &mut Request, depot: &mut Depot, res: &mut R
             if auth_str.starts_with("Bearer ") {
                 let token = auth_str.trim_start_matches("Bearer ");
                 if let Ok(claims) = crate::app::domain::services::AuthService::verify_jwt(token) {
-                    depot.insert("current_user", CurrentUser(claims));
+                    depot.insert(KEY_CURRENT_USER, CurrentUser(claims));
                 }
             }
         }

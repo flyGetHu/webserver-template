@@ -2,6 +2,7 @@ use salvo::prelude::*;
 use std::time::Instant;
 use tracing::{info, warn};
 use uuid::Uuid;
+use crate::app::depot_keys::KEY_REQUEST_ID;
 
 /// 请求日志中间件
 ///
@@ -36,7 +37,7 @@ pub async fn request_logger(
 
     // 获取 request_id
     let request_id = depot
-        .get::<Uuid>("request_id")
+        .get::<Uuid>(KEY_REQUEST_ID)
         .cloned()
         .unwrap_or_else(|_| Uuid::new_v4());
 
@@ -132,7 +133,7 @@ pub async fn detailed_request_logger(
 
     // 获取 request_id
     let request_id = depot
-        .get::<Uuid>("request_id")
+        .get::<Uuid>(KEY_REQUEST_ID)
         .cloned()
         .unwrap_or_else(|_| Uuid::new_v4());
 

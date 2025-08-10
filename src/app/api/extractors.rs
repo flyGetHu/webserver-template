@@ -6,7 +6,7 @@ use salvo::prelude::*;
 use serde::de::DeserializeOwned;
 use validator::Validate;
 
-use crate::app::{api::middleware::auth::CurrentUser, error::AppError};
+use crate::app::{api::middleware::auth::CurrentUser, depot_keys::KEY_CURRENT_USER, error::AppError};
 
 /// 一个自定义提取器，它包装了`salvo::JsonBody`，并在反序列化后自动验证数据
 ///
@@ -39,7 +39,7 @@ impl CurrentUser {
     /// # Errors
     /// 未认证或上下文缺失时返回 `AppError`
     pub fn extract(depot: &mut Depot) -> Result<Self, AppError> {
-        if let Ok(current_user) = depot.get::<CurrentUser>("current_user") {
+        if let Ok(current_user) = depot.get::<CurrentUser>(KEY_CURRENT_USER) {
             Ok(current_user.clone())
         } else {
             Err(AppError::Business("User not authenticated".to_string()))

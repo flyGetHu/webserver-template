@@ -5,6 +5,7 @@
 pub mod docs;
 pub mod extractors;
 pub mod middleware;
+pub mod util;
 pub mod response;
 pub mod routes;
 pub mod telemetry;

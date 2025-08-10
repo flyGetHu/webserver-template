@@ -9,7 +9,7 @@ use salvo::prelude::*;
 use serde::{Deserialize, Serialize};
 use time::{Duration, OffsetDateTime};
 
-use crate::app::{config::Config, error::AppError};
+use crate::app::{config::Config, depot_keys::KEY_CURRENT_USER, error::AppError};
 
 /// JWT 声明结构体
 /// 
@@ -163,8 +163,8 @@ impl CurrentUser {
 /// 用户未认证时返回错误
 pub fn get_current_user(depot: &Depot) -> Result<CurrentUser, AppError> {
     depot
-        .get::<JwtClaims>("jwt_claims")
-        .map(|claims| CurrentUser(claims.clone()))
+        .get::<CurrentUser>(KEY_CURRENT_USER)
+        .cloned()
         .map_err(|_| AppError::Business("User not authenticated".to_string()))
 }
 

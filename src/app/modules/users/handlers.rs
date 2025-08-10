@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 use crate::app::{
     api::response::ApiResponse,
+    api::util::request_id_or_new,
     error::AppError,
     modules::users::models::{CreateUserRequest, UpdateUserRequest, UserListResponse, UserResponse},
 };
@@ -29,10 +30,7 @@ pub async fn list_users(
     depot: &mut Depot,
     res: &mut Response,
 ) -> Result<(), AppError> {
-    let request_id = depot
-        .get::<Uuid>("request_id")
-        .cloned()
-        .unwrap_or_else(|_| Uuid::new_v4());
+    let request_id = request_id_or_new(depot);
 
     let page = req.query::<i32>("page").unwrap_or(1);
     let page_size = req.query::<i32>("page_size").unwrap_or(10);
@@ -66,10 +64,7 @@ pub async fn get_user(
     depot: &mut Depot,
     res: &mut Response,
 ) -> Result<(), AppError> {
-    let request_id = depot
-        .get::<Uuid>("request_id")
-        .cloned()
-        .unwrap_or_else(|_| Uuid::new_v4());
+    let request_id = request_id_or_new(depot);
 
     let id = req
         .param::<i32>("id")
@@ -105,10 +100,7 @@ pub async fn create_user(
     depot: &mut Depot,
     res: &mut Response,
 ) -> Result<(), AppError> {
-    let request_id = depot
-        .get::<Uuid>("request_id")
-        .cloned()
-        .unwrap_or_else(|_| Uuid::new_v4());
+    let request_id = request_id_or_new(depot);
 
     let payload = req
         .parse_json::<CreateUserRequest>()
@@ -149,10 +141,7 @@ pub async fn update_user(
     depot: &mut Depot,
     res: &mut Response,
 ) -> Result<(), AppError> {
-    let request_id = depot
-        .get::<Uuid>("request_id")
-        .cloned()
-        .unwrap_or_else(|_| Uuid::new_v4());
+    let request_id = request_id_or_new(depot);
 
     let id = req
         .param::<i32>("id")

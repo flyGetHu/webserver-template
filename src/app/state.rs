@@ -4,6 +4,7 @@
 
 use bb8_redis::{bb8, RedisConnectionManager};
 use rbatis::RBatis;
+use std::sync::Arc;
 use tracing::info;
 
 /// Redis连接池类型别名
@@ -14,10 +15,10 @@ pub type RedisPool = bb8::Pool<RedisConnectionManager>;
 /// 包含所有需要在处理程序之间共享的状态
 #[derive(Clone)]
 pub struct AppState {
-    /// `RBatis` 数据库实例
-    pub rb: RBatis,
-    /// Redis连接池
-    pub redis_pool: RedisPool,
+    /// `RBatis` 数据库实例（共享引用）
+    pub rb: Arc<RBatis>,
+    /// Redis连接池（共享引用）
+    pub redis_pool: Arc<RedisPool>,
 }
 
 impl AppState {
@@ -25,8 +26,8 @@ impl AppState {
     #[must_use]
     pub fn new(rb: RBatis, redis_pool: RedisPool) -> Self {
         Self {
-            rb,
-            redis_pool,
+            rb: Arc::new(rb),
+            redis_pool: Arc::new(redis_pool),
         }
     }
 }

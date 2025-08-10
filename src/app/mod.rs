@@ -3,6 +3,7 @@
 pub mod api;
 pub mod config;
 pub mod container;
+pub mod depot_keys;
 pub mod domain;
 pub mod error;
 pub mod hoops;
@@ -23,7 +24,7 @@ use crate::app::{
         routes::create_routes,
     },
     config::Config,
-    container::{inject_services_middleware, AppServices},
+    container::{inject_registries_middleware, RepositoryRegistry, ServiceRegistry},
     state::AppState,
 };
 
@@ -68,8 +69,9 @@ pub async fn run() -> anyhow::Result<()> {
     let app_state = AppState::new(rb, redis_pool);
     let app_state = Arc::new(app_state);
 
-    // 创建应用服务容器
-    let services = Arc::new(AppServices::new(Arc::new(config.clone()), app_state.clone()));
+    // 创建注册表（Repository 与 Service 分离）
+    let repositories = Arc::new(RepositoryRegistry::new(app_state.clone()));
+    let services = Arc::new(ServiceRegistry::new(Arc::new(config.clone()), app_state.clone(), repositories.clone()));
 
     // 绑定地址 - 使用新的 listen_addr 配置
     let addr: std::net::SocketAddr = config
@@ -83,7 +85,7 @@ pub async fn run() -> anyhow::Result<()> {
     let router = create_routes()
         .hoop(create_request_id_middleware()) // Salvo 内置 RequestId 中间件
         .hoop(request_id_handler) // 自定义处理器，集成 tracing 和 depot
-        .hoop(inject_services_middleware(services)) // 新的服务注入中间件
+        .hoop(inject_registries_middleware(services, repositories)) // 注入服务与仓库注册表
         .hoop(request_logger) // 请求日志中间件
         .hoop(global_exception_handler); // 全局异常处理
 

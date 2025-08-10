@@ -1,4 +1,4 @@
-//! 服务容器模块 - Salvo 最佳实践版本
+//! 服务容器与注册表模块 - 分离 Service/Repository 的注入方式
 //!
 //! 提供与 Salvo 框架深度集成的依赖注入容器
 //! 使用 Salvo 的 Depot 机制进行服务管理
@@ -8,68 +8,82 @@ use std::sync::Arc;
 
 use crate::app::{
     config::Config,
+    depot_keys::{KEY_REPOSITORY_REGISTRY, KEY_SERVICE_REGISTRY},
     domain::services::{auth_service::AuthService, user_service::UserService},
     infrastructure::persistence::user_repository::UserRepository,
     state::AppState,
 };
 
-/// 应用服务容器
-///
-/// 使用 Salvo 推荐的简单直接的方式管理服务依赖
-/// 避免过度工程化，专注于实用性和可维护性
+/// 仓库注册表：集中管理 Repository 对象
 #[derive(Clone)]
-pub struct AppServices {
+pub struct RepositoryRegistry {
+    pub user_repository: Arc<UserRepository>,
+}
+
+impl RepositoryRegistry {
+    #[must_use]
+    pub fn new(app_state: Arc<AppState>) -> Self {
+        let user_repository = Arc::new(UserRepository::new(app_state.rb.clone()));
+        Self { user_repository }
+    }
+}
+
+/// 服务注册表：集中管理 Service 对象，并依赖 RepositoryRegistry
+#[derive(Clone)]
+pub struct ServiceRegistry {
     pub config: Arc<Config>,
     pub app_state: Arc<AppState>,
-    pub user_repository: Arc<UserRepository>,
+    pub repositories: Arc<RepositoryRegistry>,
     pub auth_service: Arc<AuthService>,
     pub user_service: Arc<UserService>,
 }
 
-impl AppServices {
-    /// 创建应用服务容器
-    ///
-    /// 按照依赖顺序初始化所有服务
+impl ServiceRegistry {
     #[must_use]
-    pub fn new(config: Arc<Config>, app_state: Arc<AppState>) -> Self {
-        // 创建用户仓库
-        let user_repository = Arc::new(UserRepository::new(Arc::new(app_state.rb.clone())));
-
-        // 创建认证服务
-        let auth_service = Arc::new(AuthService::new(
-            Arc::new(app_state.rb.clone()),
+    pub fn new(
+        config: Arc<Config>,
+        app_state: Arc<AppState>,
+        repositories: Arc<RepositoryRegistry>,
+    ) -> Self {
+        let auth_service = Arc::new(AuthService::new(app_state.rb.clone(), config.clone()));
+        let user_service = Arc::new(UserService::new(
+            repositories.user_repository.clone(),
             config.clone(),
         ));
-
-        // 创建用户服务
-        let user_service = Arc::new(UserService::new(user_repository.clone(), config.clone()));
 
         Self {
             config,
             app_state,
-            user_repository,
+            repositories,
             auth_service,
             user_service,
         }
     }
 }
 
-/// 创建服务注入中间件
+/// 创建注册表注入中间件
 ///
-/// 返回一个中间件 Handler，将 `AppServices` 注入到 Depot 中
+/// 返回一个中间件 Handler，将 `ServiceRegistry` 与 `RepositoryRegistry` 注入到 Depot 中
 #[must_use]
-pub fn inject_services_middleware(services: Arc<AppServices>) -> ServiceInjectionHandler {
-    ServiceInjectionHandler { services }
+pub fn inject_registries_middleware(
+    services: Arc<ServiceRegistry>,
+    repositories: Arc<RepositoryRegistry>,
+) -> RegistryInjectionHandler {
+    RegistryInjectionHandler {
+        services,
+        repositories,
+    }
 }
 
-/// 服务注入中间件 Handler
+/// 注册表注入中间件 Handler
 #[derive(Clone)]
-pub struct ServiceInjectionHandler {
-    services: Arc<AppServices>,
+pub struct RegistryInjectionHandler {
+    services: Arc<ServiceRegistry>,
+    repositories: Arc<RepositoryRegistry>,
 }
 
 #[async_trait::async_trait]
-impl Handler for ServiceInjectionHandler {
+impl Handler for RegistryInjectionHandler {
     async fn handle(
         &self,
         request: &mut Request,
@@ -77,22 +91,16 @@ impl Handler for ServiceInjectionHandler {
         response: &mut Response,
         ctrl: &mut FlowCtrl,
     ) {
-        // 将各个服务注入到 Depot 中
-        depot.insert("app_services", self.services.clone());
-        depot.insert("config", self.services.config.clone());
-        depot.insert("app_state", self.services.app_state.clone());
-        depot.insert("user_repository", self.services.user_repository.clone());
-        depot.insert("auth_service", self.services.auth_service.clone());
-        depot.insert("user_service", self.services.user_service.clone());
+        // 注入分层注册表，类似 Spring 层级 Bean 管理
+        depot.insert(KEY_SERVICE_REGISTRY, self.services.clone());
+        depot.insert(KEY_REPOSITORY_REGISTRY, self.repositories.clone());
 
         // 继续处理请求
         ctrl.call_next(request, depot, response).await;
     }
 }
 
-/// 便捷的服务注入中间件 Handler
-///
-/// 简化版本的服务注入器，用于直接在路由中使用
+// 保留一个空 handler 以兼容结构（如需链路占位）
 #[handler]
 pub async fn inject_services(
     req: &mut Request,
@@ -100,36 +108,17 @@ pub async fn inject_services(
     res: &mut Response,
     ctrl: &mut FlowCtrl,
 ) {
-    // 这个函数现在主要用于测试或特殊场景
-    // 实际使用中推荐使用 inject_services_middleware 函数
     ctrl.call_next(req, depot, res).await;
 }
 
-/// 便捷的服务获取宏
-///
-/// 从 Depot 中获取服务的便捷方法
-#[macro_export]
-macro_rules! get_service {
-    ($depot:expr, $service_type:ty, $service_name:expr) => {
-        $depot
-            .get::<Arc<$service_type>>($service_name)
-            .map(|s| s.clone())
-            .map_err(|_| {
-                $crate::app::error::AppError::Internal(format!(
-                    "Service {} not found in depot",
-                    $service_name
-                ))
-            })
-    };
-}
+/// 便捷的服务获取扩展
 
 /// 服务获取的便捷扩展 trait
 pub trait DepotServiceExt {
-    /// 获取完整的应用服务容器
-    ///
-    /// # Errors
-    /// 当 `AppServices` 未注入到 `Depot` 时返回错误
-    fn get_app_services(&self) -> Result<Arc<AppServices>, crate::app::error::AppError>;
+    /// 获取 Service 注册表
+    fn services(&self) -> Result<Arc<ServiceRegistry>, crate::app::error::AppError>;
+    /// 获取 Repository 注册表
+    fn repositories(&self) -> Result<Arc<RepositoryRegistry>, crate::app::error::AppError>;
     /// 获取用户仓库服务
     ///
     /// # Errors
@@ -158,28 +147,38 @@ pub trait DepotServiceExt {
 }
 
 impl DepotServiceExt for Depot {
-    fn get_app_services(&self) -> Result<Arc<AppServices>, crate::app::error::AppError> {
-        get_service!(self, AppServices, "app_services")
+    fn services(&self) -> Result<Arc<ServiceRegistry>, crate::app::error::AppError> {
+        self
+            .get::<Arc<ServiceRegistry>>(KEY_SERVICE_REGISTRY)
+            .map(|s| s.clone())
+            .map_err(|_| crate::app::error::AppError::Internal("ServiceRegistry not found in depot".to_string()))
+    }
+
+    fn repositories(&self) -> Result<Arc<RepositoryRegistry>, crate::app::error::AppError> {
+        self
+            .get::<Arc<RepositoryRegistry>>(KEY_REPOSITORY_REGISTRY)
+            .map(|s| s.clone())
+            .map_err(|_| crate::app::error::AppError::Internal("RepositoryRegistry not found in depot".to_string()))
     }
 
     fn get_user_repository(&self) -> Result<Arc<UserRepository>, crate::app::error::AppError> {
-        get_service!(self, UserRepository, "user_repository")
+        self.repositories().map(|r| r.user_repository.clone())
     }
 
     fn get_auth_service(&self) -> Result<Arc<AuthService>, crate::app::error::AppError> {
-        get_service!(self, AuthService, "auth_service")
+        self.services().map(|s| s.auth_service.clone())
     }
 
     fn get_user_service(&self) -> Result<Arc<UserService>, crate::app::error::AppError> {
-        get_service!(self, UserService, "user_service")
+        self.services().map(|s| s.user_service.clone())
     }
 
     fn get_config(&self) -> Result<Arc<Config>, crate::app::error::AppError> {
-        get_service!(self, Config, "config")
+        self.services().map(|s| s.config.clone())
     }
 
     fn get_app_state(&self) -> Result<Arc<AppState>, crate::app::error::AppError> {
-        get_service!(self, AppState, "app_state")
+        self.services().map(|s| s.app_state.clone())
     }
 }
 
@@ -189,16 +188,17 @@ mod tests {
     use crate::app::state::{create_mock_db_pool, create_mock_redis_pool};
 
     #[tokio::test]
-    async fn test_app_services_creation() {
+    async fn test_registries_creation() {
         let config = Arc::new(crate::app::config::Config::load().unwrap());
         let db_pool = create_mock_db_pool().unwrap();
         let redis_pool = create_mock_redis_pool().await.unwrap();
         let app_state = Arc::new(AppState::new(db_pool, redis_pool));
 
-        let services = AppServices::new(config, app_state);
+        let repositories = Arc::new(RepositoryRegistry::new(app_state.clone()));
+        let services = Arc::new(ServiceRegistry::new(config, app_state, repositories.clone()));
 
         // 验证所有服务都已正确创建
-        assert!(services.user_repository.as_ref() as *const _ as usize != 0);
+        assert!(repositories.user_repository.as_ref() as *const _ as usize != 0);
         assert!(services.auth_service.as_ref() as *const _ as usize != 0);
         assert!(services.user_service.as_ref() as *const _ as usize != 0);
     }
@@ -210,20 +210,17 @@ mod tests {
         let redis_pool = create_mock_redis_pool().await.unwrap();
         let app_state = Arc::new(AppState::new(db_pool, redis_pool));
 
-        let services = Arc::new(AppServices::new(config, app_state));
+        let repositories = Arc::new(RepositoryRegistry::new(app_state.clone()));
+        let services = Arc::new(ServiceRegistry::new(config, app_state, repositories.clone()));
 
         let mut depot = Depot::new();
-        // 模拟服务注入中间件的行为
-        depot.insert("app_services", services.clone());
-        depot.insert("user_repository", services.user_repository.clone());
-        depot.insert("auth_service", services.auth_service.clone());
-        depot.insert("user_service", services.user_service.clone());
-        depot.insert("config", services.config.clone());
-        depot.insert("app_state", services.app_state.clone());
+        // 模拟服务注入中间件的行为：注入两个注册表
+        depot.insert(KEY_SERVICE_REGISTRY, services.clone());
+        depot.insert(KEY_REPOSITORY_REGISTRY, repositories.clone());
 
         // 测试服务获取
-        let app_services = depot.get_app_services();
-        assert!(app_services.is_ok());
+        let srvs = depot.services();
+        assert!(srvs.is_ok());
 
         let user_repo = depot.get_user_repository();
         assert!(user_repo.is_ok());
@@ -248,10 +245,11 @@ mod tests {
         let redis_pool = create_mock_redis_pool().await.unwrap();
         let app_state = Arc::new(AppState::new(db_pool, redis_pool));
 
-        let services = Arc::new(AppServices::new(config, app_state));
+        let repositories = Arc::new(RepositoryRegistry::new(app_state.clone()));
+        let services = Arc::new(ServiceRegistry::new(config, app_state, repositories.clone()));
 
         // 测试中间件创建
-        let _middleware = inject_services_middleware(services.clone());
+        let _middleware = inject_registries_middleware(services.clone(), repositories.clone());
 
         // 验证中间件可以正常创建
         // 注意：这里只是验证中间件函数可以创建，实际的注入测试需要在集成测试中进行

@@ -6,7 +6,11 @@ use salvo::prelude::*;
 use uuid::Uuid;
 
 use crate::app::{
-    api::response::ApiResponse, container::DepotServiceExt, error::AppError,
+    api::response::ApiResponse,
+    api::util::request_id_or_new,
+    container::DepotServiceExt,
+    depot_keys::KEY_REQUEST_ID,
+    error::AppError,
     modules::auth::models::{AuthResponse, LoginRequest, RegisterRequest},
 };
 
@@ -26,10 +30,7 @@ pub async fn register(
     res: &mut Response,
 ) -> Result<(), AppError> {
     // 获取 request_id
-    let request_id = depot
-        .get::<Uuid>("request_id")
-        .cloned()
-        .unwrap_or_else(|_| Uuid::new_v4());
+    let request_id = request_id_or_new(depot);
 
     // 解析请求数据
     let payload = req
@@ -74,10 +75,7 @@ pub async fn login(
     depot: &mut Depot,
     res: &mut Response,
 ) -> Result<(), AppError> {
-    let request_id = depot
-        .get::<Uuid>("request_id")
-        .cloned()
-        .unwrap_or_else(|_| Uuid::new_v4());
+    let request_id = request_id_or_new(depot);
 
     let payload = req
         .parse_json::<LoginRequest>()
@@ -107,10 +105,7 @@ pub async fn login(
     )
 )]
 pub async fn logout(depot: &mut Depot, res: &mut Response) -> Result<(), AppError> {
-    let request_id = depot
-        .get::<Uuid>("request_id")
-        .cloned()
-        .unwrap_or_else(|_| Uuid::new_v4());
+    let request_id = request_id_or_new(depot);
 
     // TODO: 从请求头获取token
     // 临时实现 - JWT 是无状态的，注销操作通常由客户端处理

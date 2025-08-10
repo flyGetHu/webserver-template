@@ -1,6 +1,7 @@
 use salvo::prelude::*;
 use serde::Serialize;
 use uuid::Uuid;
+use crate::app::depot_keys::KEY_REQUEST_ID;
 
 /// 404错误响应结构体
 #[derive(Serialize)]
@@ -19,7 +20,7 @@ pub async fn global_exception_handler(
     ctrl: &mut FlowCtrl,
 ) {
     let _request_id = depot
-        .get::<Uuid>("request_id")
+        .get::<Uuid>(KEY_REQUEST_ID)
         .cloned()
         .unwrap_or_else(|_| Uuid::new_v4());
 

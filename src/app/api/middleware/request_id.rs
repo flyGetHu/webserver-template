@@ -3,6 +3,7 @@ use salvo::prelude::*;
 use tracing::info_span;
 use tracing::Instrument;
 use uuid::Uuid;
+use crate::app::depot_keys::KEY_REQUEST_ID;
 
 /// 创建配置好的 `RequestId` 中间件
 ///
@@ -28,7 +29,7 @@ pub async fn request_id_handler(
 
     // 将 request_id 存储到 depot 中供后续使用
     let request_uuid = Uuid::parse_str(&request_id).unwrap_or_else(|_| Uuid::new_v4());
-    depot.insert("request_id", request_uuid);
+    depot.insert(KEY_REQUEST_ID, request_uuid);
 
     // 创建包含 request_id 的 tracing span
     let span = info_span!("request", request_id = %request_id);
