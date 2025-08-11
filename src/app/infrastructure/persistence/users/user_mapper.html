@@ -1,0 +1,207 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "https://raw.githubusercontent.com/rbatis/rbatis/master/rbatis-codegen/mybatis-3-mapper.dtd">
+<mapper>
+    <!-- 基础查询SQL片段 -->
+    <sql id="user_base_columns">
+        `id, username, email, password_hash, is_active, created_at, updated_at`
+    </sql>
+    
+    <sql id="user_base_where">
+        <where>
+            <if test="id != null">
+                `and id = #{id}`
+            </if>
+            <if test="username != null and username != ''">
+                `and username = #{username}`
+            </if>
+            <if test="email != null and email != ''">
+                `and email = #{email}`
+            </if>
+            <if test="is_active != null">
+                `and is_active = #{is_active}`
+            </if>
+        </where>
+    </sql>
+
+    <!-- 复杂条件查询用户 -->
+    <select id="select_users_by_complex_condition">
+        `SELECT` <include refid="user_base_columns"/> `FROM users`
+        <where>
+            <if test="username != null and username != ''">
+                `AND username LIKE CONCAT('%', #{username}, '%')`
+            </if>
+            <if test="email != null and email != ''">
+                `AND email LIKE CONCAT('%', #{email}, '%')`
+            </if>
+            <if test="is_active != null">
+                `AND is_active = #{is_active}`
+            </if>
+            <if test="start_date != null and start_date != ''">
+                `AND created_at >= #{start_date}`
+            </if>
+            <if test="end_date != null and end_date != ''">
+                `AND created_at <= #{end_date}`
+            </if>
+            <if test="age_min != null">
+                `AND age >= #{age_min}`
+            </if>
+            <if test="age_max != null">
+                `AND age <= #{age_max}`
+            </if>
+            <if test="roles != null">
+                `AND (`
+                <foreach collection="roles" item="role" separator=" OR ">
+                    `JSON_CONTAINS(roles, JSON_QUOTE(#{role}))`
+                </foreach>
+                `)`
+            </if>
+        </where>
+        <choose>
+            <when test="sort_by == 'username'">
+                `ORDER BY username`
+            </when>
+            <when test="sort_by == 'email'">
+                `ORDER BY email`
+            </when>
+            <when test="sort_by == 'created_at'">
+                `ORDER BY created_at`
+            </when>
+            <otherwise>
+                `ORDER BY id`
+            </otherwise>
+        </choose>
+        <if test="sort_order == 'DESC'">
+            `DESC`
+        </if>
+        <if test="sort_order == 'ASC'">
+            `ASC`
+        </if>
+        <if test="limit != null and offset != null">
+            `LIMIT #{limit} OFFSET #{offset}`
+        </if>
+    </select>
+
+    <!-- 统计符合条件的用户数量 -->
+    <select id="count_users_by_complex_condition">
+        `SELECT COUNT(*) FROM users`
+        <where>
+            <if test="username != null and username != ''">
+                `AND username LIKE CONCAT('%', #{username}, '%')`
+            </if>
+            <if test="email != null and email != ''">
+                `AND email LIKE CONCAT('%', #{email}, '%')`
+            </if>
+            <if test="is_active != null">
+                `AND is_active = #{is_active}`
+            </if>
+            <if test="start_date != null and start_date != ''">
+                `AND created_at >= #{start_date}`
+            </if>
+            <if test="end_date != null and end_date != ''">
+                `AND created_at <= #{end_date}`
+            </if>
+            <if test="age_min != null">
+                `AND age >= #{age_min}`
+            </if>
+            <if test="age_max != null">
+                `AND age <= #{age_max}`
+            </if>
+            <if test="roles != null">
+                `AND (`
+                <foreach collection="roles" item="role" separator=" OR ">
+                    `JSON_CONTAINS(roles, JSON_QUOTE(#{role}))`
+                </foreach>
+                `)`
+            </if>
+        </where>
+    </select>
+
+    <!-- 搜索用户（关键词匹配用户名或邮箱） -->
+    <select id="search_users_paginated">
+        `SELECT` <include refid="user_base_columns"/> `FROM users`
+        <where>
+            <if test="keyword != null and keyword != ''">
+                `AND (username LIKE CONCAT('%', #{keyword}, '%') OR email LIKE CONCAT('%', #{keyword}, '%'))`
+            </if>
+        </where>
+        `ORDER BY created_at DESC`
+        <if test="limit != null and offset != null">
+            `LIMIT #{limit} OFFSET #{offset}`
+        </if>
+    </select>
+
+    <!-- 统计搜索结果数量 -->
+    <select id="count_search_users">
+        `SELECT COUNT(*) FROM users`
+        <where>
+            <if test="keyword != null and keyword != ''">
+                `AND (username LIKE CONCAT('%', #{keyword}, '%') OR email LIKE CONCAT('%', #{keyword}, '%'))`
+            </if>
+        </where>
+    </select>
+
+    <!-- 用户统计报表（按状态分组） -->
+    <select id="get_user_statistics">
+        `SELECT 
+            is_active,
+            COUNT(*) as user_count,
+            AVG(age) as avg_age,
+            MIN(created_at) as earliest_registration,
+            MAX(created_at) as latest_registration
+        FROM users`
+        <where>
+            <if test="start_date != null and start_date != ''">
+                `AND created_at >= #{start_date}`
+            </if>
+            <if test="end_date != null and end_date != ''">
+                `AND created_at <= #{end_date}`
+            </if>
+        </where>
+        `GROUP BY is_active ORDER BY is_active DESC`
+    </select>
+
+    <!-- 连表查询：用户及其登录信息 -->
+    <select id="get_users_with_login_info">
+        `SELECT 
+            u.id,
+            u.username,
+            u.email,
+            u.is_active,
+            u.created_at,
+            COALESCE(COUNT(l.id), 0) as login_count,
+            MAX(l.login_time) as last_login_time
+        FROM users u
+        LEFT JOIN user_login_logs l ON u.id = l.user_id`
+        <where>
+            <if test="is_active != null">
+                `AND u.is_active = #{is_active}`
+            </if>
+            <if test="has_logged_in != null and has_logged_in == true">
+                `AND l.id IS NOT NULL`
+            </if>
+            <if test="login_start_date != null and login_start_date != ''">
+                `AND l.login_time >= #{login_start_date}`
+            </if>
+            <if test="login_end_date != null and login_end_date != ''">
+                `AND l.login_time <= #{login_end_date}`
+            </if>
+        </where>
+        `GROUP BY u.id, u.username, u.email, u.is_active, u.created_at`
+        <if test="min_login_count != null">
+            `HAVING COUNT(l.id) >= #{min_login_count}`
+        </if>
+        `ORDER BY login_count DESC, u.created_at DESC`
+        <if test="limit != null and offset != null">
+            `LIMIT #{limit} OFFSET #{offset}`
+        </if>
+    </select>
+
+    <!-- 分页查询示例 -->
+    <select id="select_page_data">
+        <if test="do_count == true">
+            `SELECT COUNT(*) FROM users`
+        </if>
+        <if test="do_count == false">
+            `SELECT` <include refid="user_base_columns"/> `FROM users ORDER BY created_at DESC LIMIT #{page_size} OFFSET #{page_no}`
+        </if>
+    </select>
+</mapper>

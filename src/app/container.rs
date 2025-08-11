@@ -10,7 +10,7 @@ use crate::app::{
     config::Config,
     depot_keys::{KEY_REPOSITORY_REGISTRY, KEY_SERVICE_REGISTRY},
     domain::services::{auth_service::AuthService, user_service::UserService},
-    infrastructure::persistence::user_repository::UserRepository,
+    infrastructure::persistence::UserRepository,
     state::AppState,
 };
 

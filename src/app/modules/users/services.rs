@@ -2,62 +2,58 @@
 //!
 //! 处理用户管理相关的业务逻辑
 
+use std::sync::Arc;
 use validator::Validate;
 
+use std::collections::HashMap;
+
 use crate::app::{
+    domain::models::User,
     error::AppError,
-    modules::users::models::{CreateUserRequest, UpdateUserRequest, UserListResponse, UserResponse},
+    infrastructure::pagination::PaginationParams,
+    infrastructure::persistence::UserRepository,
+    modules::users::models::{CreateUserRequest, UpdateUserRequest, UserResponse},
 };
 
 /// 用户服务
-pub struct UserService;
+pub struct UserService {
+    user_repository: Arc<UserRepository>,
+}
 
 impl UserService {
     /// 创建新的用户服务实例
     #[must_use]
-    pub fn new() -> Self {
-        Self
+    pub fn new(user_repository: Arc<UserRepository>) -> Self {
+        Self { user_repository }
     }
 
-    /// 获取用户列表
+    /// 获取用户列表（支持分页和搜索）
     /// # Errors
     /// 验证失败时返回 `AppError::Validation`
-    pub fn list_users(
+    pub async fn list_users(
         &self,
-        page: i32,
-        page_size: i32,
-    ) -> Result<UserListResponse, AppError> {
-        // TODO: 实际的查询逻辑
-        // 1. 从数据库查询用户列表
-        // 2. 分页处理
-        // 3. 返回结果
+        params: PaginationParams,
+        _query_params: HashMap<String, rbs::Value>,
+    ) -> Result<crate::app::infrastructure::pagination::PaginatedResponse<User>, AppError> {
+        self.user_repository.find_users_paginated(&params).await
+    }
 
-        // 临时实现
-        let users = vec![
-            UserResponse {
-                id: 1,
-                username: "user1".to_string(),
-                email: "user1@example.com".to_string(),
-                age: Some(25),
-                created_at: "2024-01-01T00:00:00Z".to_string(),
-                updated_at: "2024-01-01T00:00:00Z".to_string(),
-            },
-            UserResponse {
-                id: 2,
-                username: "user2".to_string(),
-                email: "user2@example.com".to_string(),
-                age: Some(30),
-                created_at: "2024-01-01T00:00:00Z".to_string(),
-                updated_at: "2024-01-01T00:00:00Z".to_string(),
-            },
-        ];
-
-        Ok(UserListResponse {
-            users,
-            total: 2,
-            page,
-            page_size,
-        })
+    /// 根据关键词搜索用户
+    /// # Errors
+    /// 验证失败时返回 `AppError::Validation`
+    pub async fn search_by_keyword(
+        &self,
+        params: PaginationParams,
+        keyword: Option<String>,
+    ) -> Result<crate::app::infrastructure::pagination::PaginatedResponse<User>, AppError> {
+        let mut query_params = HashMap::new();
+        if let Some(kw) = keyword {
+            if !kw.trim().is_empty() {
+                query_params.insert("username".to_string(), rbs::Value::String(format!("%{}%", kw.trim())));
+                query_params.insert("email".to_string(), rbs::Value::String(format!("%{}%", kw.trim())));
+            }
+        }
+        self.user_repository.find_users_paginated(&params).await
     }
 
     /// 根据ID获取用户

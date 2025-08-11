@@ -5,10 +5,15 @@
 use salvo::prelude::*;
 use uuid::Uuid;
 
+use std::collections::HashMap;
+use rbs::Value;
+
 use crate::app::{
     api::response::ApiResponse,
     api::util::request_id_or_new,
+    container::DepotServiceExt,
     error::AppError,
+    infrastructure::pagination::PaginationParams,
     modules::users::models::{CreateUserRequest, UpdateUserRequest, UserListResponse, UserResponse},
 };
 
@@ -17,8 +22,16 @@ use crate::app::{
     tags("Users"),
     operation_id = "list_users",
     parameters(
-        ("page" = i32, Query, description = "Page number", example = 1),
-        ("page_size" = i32, Query, description = "Page size", example = 10)
+        ("page" = i64, Query, description = "Page number", example = 1),
+        ("per_page" = i64, Query, description = "Items per page", example = 20),
+        ("search" = String, Query, description = "Search keyword for username or email", example = "john"),
+        ("username" = String, Query, description = "Filter by username", example = "admin"),
+        ("email" = String, Query, description = "Filter by email", example = "admin@example.com"),
+        ("age_min" = i32, Query, description = "Minimum age filter", example = 18),
+        ("age_max" = i32, Query, description = "Maximum age filter", example = 65),
+        ("is_active" = bool, Query, description = "Filter by active status", example = true),
+        ("sort_by" = String, Query, description = "Sort field", example = "created_at"),
+        ("sort_order" = String, Query, description = "Sort order (asc/desc)", example = "desc")
     ),
     responses(
         (status_code = 200, description = "Users retrieved successfully", body = UserListResponse),
@@ -32,19 +45,67 @@ pub async fn list_users(
 ) -> Result<(), AppError> {
     let request_id = request_id_or_new(depot);
 
-    let page = req.query::<i32>("page").unwrap_or(1);
-    let page_size = req.query::<i32>("page_size").unwrap_or(10);
-
-    // 临时实现 - 返回模拟用户列表
-    let response = UserListResponse {
-        users: vec![],
-        total: 0,
-        page,
-        page_size,
+    let params = PaginationParams {
+        page: req.query::<i64>("page").unwrap_or(1),
+        per_page: req.query::<i64>("per_page").unwrap_or(20),
+        search: req.query::<String>("search"),
+        sort_by: req.query::<String>("sort_by"),
+        sort_order: req.query::<String>("sort_order"),
+        filters: None,
     };
+
+    // 构建查询参数
+    let query_params = build_query_params(req);
+
+    // 获取用户服务
+    let user_service = depot.get_user_service()?;
+    
+    let paginated_users = user_service.get_users_paginated(params, &query_params).await?;
+    
+    let response = UserListResponse::from(paginated_users);
 
     res.render(Json(ApiResponse::new(response, request_id)));
     Ok(())
+}
+
+/// 从请求构建查询参数
+fn build_query_params(req: &Request) -> HashMap<String, Value> {
+    let mut params = HashMap::new();
+    
+    // 全局搜索
+    if let Some(keyword) = req.query::<String>("search") {
+        if !keyword.trim().is_empty() {
+            params.insert("username".to_string(), Value::String(format!("%{}%", keyword.trim())));
+            params.insert("email".to_string(), Value::String(format!("%{}%", keyword.trim())));
+        }
+    }
+    
+    // 特定字段过滤
+    if let Some(username) = req.query::<String>("username") {
+        if !username.trim().is_empty() {
+            params.insert("username".to_string(), Value::String(format!("%{}%", username.trim())));
+        }
+    }
+    
+    if let Some(email) = req.query::<String>("email") {
+        if !email.trim().is_empty() {
+            params.insert("email".to_string(), Value::String(format!("%{}%", email.trim())));
+        }
+    }
+    
+    if let Some(min) = req.query::<i32>("age_min") {
+        params.insert("age_min".to_string(), Value::I32(min));
+    }
+    
+    if let Some(max) = req.query::<i32>("age_max") {
+        params.insert("age_max".to_string(), Value::I32(max));
+    }
+    
+    if let Some(active) = req.query::<bool>("is_active") {
+        params.insert("is_active".to_string(), Value::Bool(active));
+    }
+    
+    params
 }
 
 /// 根据ID获取用户处理器

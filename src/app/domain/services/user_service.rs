@@ -2,9 +2,12 @@
 
 use std::sync::Arc;
 
+use std::collections::HashMap;
 use crate::app::{
-    config::Config, domain::models::User, error::AppError,
-    infrastructure::persistence::user_repository::UserRepository,
+    config::Config, 
+    domain::models::User, 
+    error::AppError,
+    infrastructure::{pagination::PaginationParams, persistence::UserRepository},
 };
 
 /// 用户服务
@@ -30,6 +33,17 @@ impl UserService {
     /// 数据库查询失败
     pub async fn get_all_users(&self, limit: i64, offset: i64) -> Result<Vec<User>, AppError> {
         self.user_repository.find_all(limit, offset).await
+    }
+
+    /// 获取用户列表（支持分页和动态条件）
+    /// # Errors
+    /// 数据库查询失败
+    pub async fn get_users_paginated(
+        &self,
+        params: PaginationParams,
+        _query_params: &HashMap<String, rbs::Value>,
+    ) -> Result<crate::app::infrastructure::pagination::PaginatedResponse<User>, AppError> {
+        self.user_repository.find_users_paginated(&params).await
     }
 
     /// 通过ID获取用户

@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 use salvo::oapi::ToSchema;
 use validator::Validate;
+use crate::app::infrastructure::pagination::{PaginatedResponse, PaginationInfo};
 
 /// 创建用户请求
 #[derive(Deserialize, Serialize, Validate, Debug, ToSchema)]
@@ -54,10 +55,24 @@ pub struct UserResponse {
 pub struct UserListResponse {
     /// 用户列表
     pub users: Vec<UserResponse>,
-    /// 总数
-    pub total: i64,
-    /// 当前页
-    pub page: i32,
-    /// 每页大小
-    pub page_size: i32,
+    /// 分页信息
+    pub pagination: PaginationInfo,
+}
+
+impl From<PaginatedResponse<crate::app::domain::models::User>> for UserListResponse {
+    fn from(response: PaginatedResponse<crate::app::domain::models::User>) -> Self {
+        let users = response.data.into_iter().map(|user| UserResponse {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            age: user.age,
+            created_at: user.created_at.to_rfc3339(),
+            updated_at: user.updated_at.to_rfc3339(),
+        }).collect();
+
+        Self {
+            users,
+            pagination: response.pagination,
+        }
+    }
 }
