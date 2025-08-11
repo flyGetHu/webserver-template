@@ -6,9 +6,9 @@
 use std::sync::Arc;
 use std::collections::HashMap;
 
-use rbatis::RBatis;
+use rbatis::{RBatis, html_sql, impled};
 use rbatis::rbdc::datetime::DateTime;
-use rbatis::sql::PageRequest;
+use rbatis::PageRequest;
 use rbs::{Value};
 use serde::{Deserialize, Serialize};
 
@@ -60,26 +60,7 @@ pub struct UserWithLoginInfo {
 // 使用htmlsql!宏定义复杂查询函数
 // 参考文档中的语法: htmlsql!(function_name(params) -> ReturnType => "path/to/mapper.html")
 
-/// 复杂条件查询用户（分页）
-htmlsql!(select_users_by_complex_condition(rb: &dyn rbatis::executor::Executor, params: &HashMap<String, Value>) -> rbatis::Result<Vec<User>> => "src/app/infrastructure/persistence/users/user_mapper.html");
 
-/// 统计符合条件的用户数量
-htmlsql!(count_users_by_complex_condition(rb: &dyn rbatis::executor::Executor, params: &HashMap<String, Value>) -> rbatis::Result<i64> => "src/app/infrastructure/persistence/users/user_mapper.html");
-
-/// 搜索用户（关键词匹配）
-htmlsql!(search_users_paginated(rb: &dyn rbatis::executor::Executor, keyword: &str, limit: i64, offset: i64) -> rbatis::Result<Vec<User>> => "src/app/infrastructure/persistence/users/user_mapper.html");
-
-/// 统计搜索结果数量
-htmlsql!(count_search_users(rb: &dyn rbatis::executor::Executor, keyword: &str) -> rbatis::Result<i64> => "src/app/infrastructure/persistence/users/user_mapper.html");
-
-/// 获取用户统计信息
-htmlsql!(get_user_statistics(rb: &dyn rbatis::executor::Executor, start_date: Option<&str>, end_date: Option<&str>) -> rbatis::Result<Vec<UserStatistics>> => "src/app/infrastructure/persistence/users/user_mapper.html");
-
-/// 获取用户及其登录信息
-htmlsql!(get_users_with_login_info(rb: &dyn rbatis::executor::Executor, params: &HashMap<String, Value>) -> rbatis::Result<Vec<UserWithLoginInfo>> => "src/app/infrastructure/persistence/users/user_mapper.html");
-
-/// 分页查询示例（使用rbatis内置分页功能）
-htmlsql_select_page!(select_page_data(name: &str, dt: &DateTime) -> User => "src/app/infrastructure/persistence/users/user_mapper.html");
 
 /// 用户XML查询仓储
 #[derive(Clone)]
@@ -92,6 +73,48 @@ impl UserXmlRepository {
     #[must_use]
     pub fn new(rb: Arc<RBatis>) -> Self {
         Self { rb }
+    }
+
+    /// 复杂条件查询用户（分页）
+    #[html_sql("src/app/infrastructure/persistence/users/user_mapper.html")]
+    async fn select_users_by_complex_condition(&self, params: &HashMap<String, Value>) -> rbatis::Result<Vec<User>> {
+        impled!()
+    }
+
+    /// 统计符合条件的用户数量
+    #[html_sql("src/app/infrastructure/persistence/users/user_mapper.html")]
+    async fn count_users_by_complex_condition(&self, params: &HashMap<String, Value>) -> rbatis::Result<i64> {
+        impled!()
+    }
+
+    /// 搜索用户（关键词匹配）
+    #[html_sql("src/app/infrastructure/persistence/users/user_mapper.html")]
+    async fn search_users_paginated(&self, keyword: &str, limit: i64, offset: i64) -> rbatis::Result<Vec<User>> {
+        impled!()
+    }
+
+    /// 统计搜索结果数量
+    #[html_sql("src/app/infrastructure/persistence/users/user_mapper.html")]
+    async fn count_search_users(&self, keyword: &str) -> rbatis::Result<i64> {
+        impled!()
+    }
+
+    /// 获取用户统计信息
+    #[html_sql("src/app/infrastructure/persistence/users/user_mapper.html")]
+    async fn get_user_statistics(&self, start_date: Option<&str>, end_date: Option<&str>) -> rbatis::Result<Vec<UserStatistics>> {
+        impled!()
+    }
+
+    /// 获取用户及其登录信息
+    #[html_sql("src/app/infrastructure/persistence/users/user_mapper.html")]
+    async fn get_users_with_login_info(&self, params: &HashMap<String, Value>) -> rbatis::Result<Vec<UserWithLoginInfo>> {
+        impled!()
+    }
+
+    /// 分页查询示例（使用rbatis内置分页功能）
+    #[html_sql("src/app/infrastructure/persistence/users/user_mapper.html")]
+    async fn select_page_data(&self, page_request: &PageRequest, name: &str, dt: &DateTime) -> rbatis::Result<rbatis::Page<User>> {
+        impled!()
     }
 
     /// 复杂条件查询用户（分页）
@@ -142,14 +165,13 @@ impl UserXmlRepository {
         params.insert("offset".to_string(), Value::I64(query.offset.unwrap_or(0)));
         
         // 调用XML中定义的复杂查询
-        let users = select_users_by_complex_condition(&self.rb, &params)
+        let users = self.select_users_by_complex_condition(&params)
             .await
-            .map_err(AppError::Database)?;
-        
-        // 获取符合条件的总数
-        let total = count_users_by_complex_condition(&self.rb, &params)
+            .map_err(AppError::Rbs)?;
+
+        let total = self.count_users_by_complex_condition(&params)
             .await
-            .map_err(AppError::Database)?;
+            .map_err(AppError::Rbs)?;
         
         // 构建分页响应
         let page_size = query.limit.unwrap_or(10);
@@ -180,14 +202,13 @@ impl UserXmlRepository {
         let limit = pagination.per_page;
         
         // 调用XML中定义的搜索查询
-        let users = search_users_paginated(&self.rb, keyword, limit, offset)
+        let users = self.search_users_paginated(keyword, limit, offset)
             .await
-            .map_err(AppError::Database)?;
-        
-        // 获取总数
-        let total = count_search_users(&self.rb, keyword)
+            .map_err(AppError::Rbs)?;
+
+        let total = self.count_search_users(keyword)
             .await
-            .map_err(AppError::Database)?;
+            .map_err(AppError::Rbs)?;
         
         Ok(PaginatedResponse::new(
             users,
@@ -210,9 +231,9 @@ impl UserXmlRepository {
         start_date: Option<&str>,
         end_date: Option<&str>,
     ) -> Result<Vec<UserStatistics>, AppError> {
-        let statistics = get_user_statistics(&self.rb, start_date, end_date)
+        let statistics = self.get_user_statistics(start_date, end_date)
             .await
-            .map_err(AppError::Database)?;
+            .map_err(AppError::Rbs)?;
         
         Ok(statistics)
     }
@@ -258,9 +279,9 @@ impl UserXmlRepository {
         params.insert("offset".to_string(), Value::I64(offset.unwrap_or(0)));
         
         // 调用XML中定义的连表查询
-        let users_with_login = get_users_with_login_info(&self.rb, &params)
+        let users_with_login = self.get_users_with_login_info(&params)
             .await
-            .map_err(AppError::Database)?;
+            .map_err(AppError::Rbs)?;
         
         Ok(users_with_login)
     }
@@ -280,9 +301,9 @@ impl UserXmlRepository {
         name: &str,
         dt: &DateTime,
     ) -> Result<rbatis::Page<User>, AppError> {
-        let page_result = select_page_data(&self.rb, page_request, name, dt)
+        let page_result = self.select_page_data(page_request, name, dt)
             .await
-            .map_err(AppError::Database)?;
+            .map_err(AppError::Rbs)?;
         
         Ok(page_result)
     }

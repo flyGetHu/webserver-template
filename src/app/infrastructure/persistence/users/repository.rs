@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 use rbatis::RBatis;
 use rbatis::rbdc::datetime::DateTime;
-use rbatis::sql::PageRequest;
+use rbatis::PageRequest;
 use rbs::{value, Value};
 use serde::{Deserialize, Serialize};
 
