@@ -2,5 +2,6 @@
 
 pub mod auth;
 pub mod global_exception_handler;
+pub mod rate_limiter;
 pub mod request_id;
 pub mod request_logger;
