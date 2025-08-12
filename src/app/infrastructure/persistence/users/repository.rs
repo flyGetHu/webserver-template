@@ -18,14 +18,9 @@ use crate::app::{
     infrastructure::pagination::{PaginationParams, PaginatedResponse},
 };
 
-// 导入内部xml_repository模块的类型和函数
+// 导入内部xml_repository模块的类型
 use super::xml_repository::{
-    ComplexUserQuery, UserStatistics, UserWithLoginInfo,
-    select_users_by_complex_condition, count_users_by_complex_condition,
-    search_users_paginated as xml_search_users_paginated,
-    count_search_users, get_user_statistics as xml_get_user_statistics,
-    get_users_with_login_info as xml_get_users_with_login_info,
-    select_page_data,
+    ComplexUserQuery, UserStatistics, UserWithLoginInfo, UserXmlRepository,
 };
 
 /// 用户数据持久化仓储
@@ -35,13 +30,15 @@ use super::xml_repository::{
 #[derive(Clone)]
 pub struct UserRepository {
     rb: Arc<RBatis>,
+    xml_repo: UserXmlRepository,
 }
 
 impl UserRepository {
     /// 创建新的用户仓储实例
     #[must_use]
     pub fn new(rb: Arc<RBatis>) -> Self {
-        Self { rb }
+        let xml_repo = UserXmlRepository::new(rb.clone());
+        Self { rb, xml_repo }
     }
 
     /// 创建新用户
@@ -306,21 +303,7 @@ impl UserRepository {
         let limit = pagination.per_page;
         
         // 调用XML中定义的搜索查询
-        let users = xml_search_users_paginated(&self.rb, keyword, limit, offset)
-            .await
-            .map_err(AppError::Database)?;
-        
-        // 获取总数
-        let total = count_search_users(&self.rb, keyword)
-            .await
-            .map_err(AppError::Database)?;
-        
-        Ok(PaginatedResponse::new(
-            users,
-            pagination.page,
-            pagination.per_page,
-            total,
-        ))
+        self.xml_repo.search_users_paginated_public(keyword, pagination).await
     }
 
     // === 复杂查询方法（使用 rbatis htmlsql） ===
@@ -373,25 +356,7 @@ impl UserRepository {
         params.insert("offset".to_string(), Value::I64(query.offset.unwrap_or(0)));
         
         // 调用XML中定义的复杂查询
-        let users = select_users_by_complex_condition(&self.rb, &params)
-            .await
-            .map_err(AppError::Database)?;
-        
-        // 获取符合条件的总数
-        let total = count_users_by_complex_condition(&self.rb, &params)
-            .await
-            .map_err(AppError::Database)?;
-        
-        // 构建分页响应
-        let page_size = query.limit.unwrap_or(10);
-        let current_page = (query.offset.unwrap_or(0) / page_size) + 1;
-        
-        Ok(PaginatedResponse::new(
-            users,
-            current_page,
-            page_size,
-            total,
-        ))
+        self.xml_repo.find_users_by_complex_condition(query).await
     }
 
     /// 获取用户统计信息
@@ -407,9 +372,8 @@ impl UserRepository {
         start_date: Option<&str>,
         end_date: Option<&str>,
     ) -> Result<Vec<UserStatistics>, AppError> {
-        let statistics = xml_get_user_statistics(&self.rb, start_date, end_date)
-            .await
-            .map_err(AppError::Database)?;
+        let statistics = self.xml_repo.get_user_statistics_public(start_date, end_date)
+            .await?;
         
         Ok(statistics)
     }
@@ -455,11 +419,14 @@ impl UserRepository {
         params.insert("offset".to_string(), Value::I64(offset.unwrap_or(0)));
         
         // 调用XML中定义的连表查询
-        let users_with_login = xml_get_users_with_login_info(&self.rb, &params)
-            .await
-            .map_err(AppError::Database)?;
-        
-        Ok(users_with_login)
+        self.xml_repo.get_users_with_login_info_public(
+            is_active,
+            login_start_date,
+            login_end_date,
+            min_login_count,
+            limit,
+            offset,
+        ).await
     }
 
     /// 使用rbatis内置分页功能的示例
@@ -477,10 +444,6 @@ impl UserRepository {
         name: &str,
         dt: &DateTime,
     ) -> Result<rbatis::Page<User>, AppError> {
-        let page_result = select_page_data(&self.rb, page_request, name, dt)
-            .await
-            .map_err(AppError::Database)?;
-        
-        Ok(page_result)
+        self.xml_repo.select_page_example(page_request, name, dt).await
     }
 }

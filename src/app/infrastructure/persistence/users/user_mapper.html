@@ -10,10 +10,10 @@
             <if test="id != null">
                 `and id = #{id}`
             </if>
-            <if test="username != null and username != ''">
+            <if test="username != null">
                 `and username = #{username}`
             </if>
-            <if test="email != null and email != ''">
+            <if test="email != null">
                 `and email = #{email}`
             </if>
             <if test="is_active != null">
@@ -26,19 +26,19 @@
     <select id="select_users_by_complex_condition">
         `SELECT` <include refid="user_base_columns"/> `FROM users`
         <where>
-            <if test="username != null and username != ''">
+            <if test="username != null">
                 `AND username LIKE CONCAT('%', #{username}, '%')`
             </if>
-            <if test="email != null and email != ''">
+            <if test="email != null">
                 `AND email LIKE CONCAT('%', #{email}, '%')`
             </if>
             <if test="is_active != null">
                 `AND is_active = #{is_active}`
             </if>
-            <if test="start_date != null and start_date != ''">
+            <if test="start_date != null">
                 `AND created_at >= #{start_date}`
             </if>
-            <if test="end_date != null and end_date != ''">
+            <if test="end_date != null">
                 `AND created_at <= #{end_date}`
             </if>
             <if test="age_min != null">
@@ -75,7 +75,7 @@
         <if test="sort_order == 'ASC'">
             `ASC`
         </if>
-        <if test="limit != null and offset != null">
+        <if test="limit != null && offset != null">
             `LIMIT #{limit} OFFSET #{offset}`
         </if>
     </select>
@@ -84,19 +84,19 @@
     <select id="count_users_by_complex_condition">
         `SELECT COUNT(*) FROM users`
         <where>
-            <if test="username != null and username != ''">
+            <if test="username != null">
                 `AND username LIKE CONCAT('%', #{username}, '%')`
             </if>
-            <if test="email != null and email != ''">
+            <if test="email != null">
                 `AND email LIKE CONCAT('%', #{email}, '%')`
             </if>
             <if test="is_active != null">
                 `AND is_active = #{is_active}`
             </if>
-            <if test="start_date != null and start_date != ''">
+            <if test="start_date != null">
                 `AND created_at >= #{start_date}`
             </if>
-            <if test="end_date != null and end_date != ''">
+            <if test="end_date != null">
                 `AND created_at <= #{end_date}`
             </if>
             <if test="age_min != null">
@@ -119,12 +119,12 @@
     <select id="search_users_paginated">
         `SELECT` <include refid="user_base_columns"/> `FROM users`
         <where>
-            <if test="keyword != null and keyword != ''">
+            <if test="keyword != null">
                 `AND (username LIKE CONCAT('%', #{keyword}, '%') OR email LIKE CONCAT('%', #{keyword}, '%'))`
             </if>
         </where>
         `ORDER BY created_at DESC`
-        <if test="limit != null and offset != null">
+        <if test="limit != null && offset != null">
             `LIMIT #{limit} OFFSET #{offset}`
         </if>
     </select>
@@ -133,7 +133,7 @@
     <select id="count_search_users">
         `SELECT COUNT(*) FROM users`
         <where>
-            <if test="keyword != null and keyword != ''">
+            <if test="keyword != null">
                 `AND (username LIKE CONCAT('%', #{keyword}, '%') OR email LIKE CONCAT('%', #{keyword}, '%'))`
             </if>
         </where>
@@ -149,10 +149,10 @@
             MAX(created_at) as latest_registration
         FROM users`
         <where>
-            <if test="start_date != null and start_date != ''">
+            <if test="start_date != null">
                 `AND created_at >= #{start_date}`
             </if>
-            <if test="end_date != null and end_date != ''">
+            <if test="end_date != null">
                 `AND created_at <= #{end_date}`
             </if>
         </where>
@@ -175,13 +175,13 @@
             <if test="is_active != null">
                 `AND u.is_active = #{is_active}`
             </if>
-            <if test="has_logged_in != null and has_logged_in == true">
+            <if test="has_logged_in != null && has_logged_in == true">
                 `AND l.id IS NOT NULL`
             </if>
-            <if test="login_start_date != null and login_start_date != ''">
+            <if test="login_start_date != null">
                 `AND l.login_time >= #{login_start_date}`
             </if>
-            <if test="login_end_date != null and login_end_date != ''">
+            <if test="login_end_date != null">
                 `AND l.login_time <= #{login_end_date}`
             </if>
         </where>
@@ -190,9 +190,9 @@
             `HAVING COUNT(l.id) >= #{min_login_count}`
         </if>
         `ORDER BY login_count DESC, u.created_at DESC`
-        <if test="limit != null and offset != null">
-            `LIMIT #{limit} OFFSET #{offset}`
-        </if>
+        <if test="limit != null && offset != null">
+             `LIMIT #{limit} OFFSET #{offset}`
+         </if>
     </select>
 
     <!-- 分页查询示例 -->

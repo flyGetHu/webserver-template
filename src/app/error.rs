@@ -37,10 +37,6 @@ pub enum AppError {
     #[error("database error: `{0}`")]
     Database(#[from] rbatis::Error),
 
-    /// RBS 错误 - `rbs` 支持
-    #[error("rbs error: `{0}`")]
-    Rbs(#[from] rbs::Error),
-
     /// 未找到资源错误
     #[error("not found: `{0}`")]
     NotFound(String),
