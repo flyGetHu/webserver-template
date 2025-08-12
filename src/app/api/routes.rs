@@ -16,6 +16,7 @@ use crate::app::{api::docs, hoops, modules};
 pub fn create_routes() -> Router {
     // 创建 API 路由
     let api_router = Router::with_path("api/v1")
+        .hoop(crate::app::api::middleware::rate_limiter::rate_limiter())
         .push(modules::auth::create_routes())
         .push(modules::users::create_routes())
         .push(modules::health::create_routes());
